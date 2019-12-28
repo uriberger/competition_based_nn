@@ -848,6 +848,8 @@ def analyze_competition(winner_list, competitiors_fire_history):
     return AnalysisCode.NORMAL
 
 def extract_parameters(configuration):
+    print('Starting parameters extraction tool...')
+    
     configuration['quiet'] = True
     configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 11
     configuration['ex_sync_window'] = 80
@@ -861,7 +863,9 @@ def extract_parameters(configuration):
     dichotomized_count = 0
     
     max_iter_num = 100
-    for _ in range(max_iter_num):
+    for i in range(max_iter_num):
+        print('Starting iteration #' + str(i))
+        
         starting_loc = (0,0)
         while starting_loc == (0,0):
             starting_loc = (int(np.random.rand() * world_height), int(np.random.rand() * world_length))
@@ -876,6 +880,8 @@ def extract_parameters(configuration):
         input_vec = generate_state_from_simulator(world, initial_player, goals)
         winner_list, _, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True)
         output_code = analyze_competition(winner_list, fire_history[response_layer][action_begin_loc:action_begin_loc+ll_ac_num])
+        
+        print('\tOutput code: ' + str(output_code))
         
         if output_code in non_dichotomized_codes:
             only_losers_count = 0
@@ -929,6 +935,12 @@ def extract_parameters(configuration):
             only_winners_count = 0
             normal_count = 0
             dichotomized_count = 0
+            
+    if i == max_iter_num:
+        print('Unable to extract parameters')
+        assert(False)
+    
+    print('Extracted parameters successfully!')
 
 #############
 # Main code #
@@ -1022,3 +1034,4 @@ plt.savefig('res')'''
 
 configuration = {}
 extract_parameters(configuration)
+print(configuration)
