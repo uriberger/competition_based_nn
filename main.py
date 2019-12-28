@@ -1,7 +1,7 @@
-#######################################
-### Competition and Synchrony Model ###
-######## By Uri Berger, July 19 #######
-#######################################
+#############################################
+#### Competition and Synchrony Model V2 #####
+######### By Uri Berger, January 20 #########
+#############################################
 
 import numpy as np
 import math
