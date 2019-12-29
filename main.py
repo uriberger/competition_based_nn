@@ -783,24 +783,24 @@ def evaluate(world, goals, cur_player, iter_num, shortest_path_len, max_rounds_n
 # Parameter extraction tool #
 #############################
 
-class AnalysisCode(enum.Enum):
+class WinnerAnalysisCode(enum.Enum):
     NORMAL = 0
     ONLY_LOSERS = 1 # Need to increase sync_window and Z_ob_to_ac, and decrease sync_threshold
     ONLY_WINNERS = 2 # Need to increase Z_in, and decrease Z_ob_to_ac
     MIX = 3 # Decrease threshold-window-ratio
     NO_JUMP = 4 # Need to increase Z_in
     LOSERS_AFTER_JUMP = 5 # Decrease threshold-window-ratio
-    WINNERS_BEFORE_JUMP = 6 # Need to increase sync_threshold
+    WINNERS_BEFORE_JUMP = 6 # Increase threshold-window-ratio
     MULTIPLE_JUMP = 7 # Need to increase sync_threshold
 
 jump_factor = 2
 jump_diff = 10
 jump_compare_factor = 2
-non_dichotomized_codes = [AnalysisCode.MIX,
-                          AnalysisCode.NO_JUMP,
-                          AnalysisCode.LOSERS_AFTER_JUMP,
-                          AnalysisCode.WINNERS_BEFORE_JUMP,
-                          AnalysisCode.MULTIPLE_JUMP]
+non_dichotomized_codes = [WinnerAnalysisCode.MIX,
+                          WinnerAnalysisCode.NO_JUMP,
+                          WinnerAnalysisCode.LOSERS_AFTER_JUMP,
+                          WinnerAnalysisCode.WINNERS_BEFORE_JUMP,
+                          WinnerAnalysisCode.MULTIPLE_JUMP]
 
 def analyze_competition(winner_list, competitiors_fire_history):
     competitiors_fire_count = [len(x) for x in competitiors_fire_history]
@@ -810,15 +810,15 @@ def analyze_competition(winner_list, competitiors_fire_history):
     # First pass- make sure that there's no mixture between winners and losers
     for i in range(len(sorted_indices)):
         if finished_losers and winner_list[sorted_indices[i]] == 0:
-            return AnalysisCode.MIX
+            return WinnerAnalysisCode.MIX
         if (not finished_losers) and winner_list[sorted_indices[i]] == 1:
             finished_losers = True
     
     # Handle edge cases: only losers and only winners
     if winner_list[sorted_indices[-1]] == 0:
-        return AnalysisCode.ONLY_LOSERS
+        return WinnerAnalysisCode.ONLY_LOSERS
     elif winner_list[sorted_indices[0]] == 1:
-        return AnalysisCode.ONLY_WINNERS
+        return WinnerAnalysisCode.ONLY_WINNERS
     
     finished_losers = (winner_list[sorted_indices[0]] == 1)          
     jumps = []
@@ -833,27 +833,32 @@ def analyze_competition(winner_list, competitiors_fire_history):
     # Make sure one jump is much bigger than the rest
     jumps.sort(key=lambda x:x[1])
     if len(jumps) == 0:
-        return AnalysisCode.NO_JUMP
+        return WinnerAnalysisCode.NO_JUMP
     if len(jumps) > 1:
         if jumps[-1][1] < jump_compare_factor*jumps[-2][1]:
-            return AnalysisCode.MULTIPLE_JUMP
+            return WinnerAnalysisCode.MULTIPLE_JUMP
     jump_index = jumps[-1][0]
     
     # Make sure the biggest jump is in the right location
     if winner_list[sorted_indices[jump_index]] == 1:
-        return AnalysisCode.WINNERS_BEFORE_JUMP
+        return WinnerAnalysisCode.WINNERS_BEFORE_JUMP
     if winner_list[sorted_indices[jump_index+1]] == 0:
-        return AnalysisCode.LOSERS_AFTER_JUMP
+        return WinnerAnalysisCode.LOSERS_AFTER_JUMP
     
-    return AnalysisCode.NORMAL
+    return WinnerAnalysisCode.NORMAL
 
-def extract_parameters(configuration):
+def extract_parameters_according_to_comp_resolution(configuration):
     print('Starting parameters extraction tool...')
     
     configuration['quiet'] = True
-    configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 11
+    '''configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 11
     configuration['ex_sync_window'] = 80
     configuration['ex_sync_threshold'] = 8
+    configuration['ex_unsync_threshold'] = 1
+    configuration['Z_ll_ob_to_ll_ac'] = 0.3 * Z_ex'''
+    configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 12
+    configuration['ex_sync_window'] = 95
+    configuration['ex_sync_threshold'] = 6
     configuration['ex_unsync_threshold'] = 1
     configuration['Z_ll_ob_to_ll_ac'] = 0.3 * Z_ex
     
@@ -865,6 +870,7 @@ def extract_parameters(configuration):
     max_iter_num = 100
     for i in range(max_iter_num):
         print('Starting iteration #' + str(i))
+        print('\t' + str(configuration))
         
         starting_loc = (0,0)
         while starting_loc == (0,0):
@@ -888,30 +894,32 @@ def extract_parameters(configuration):
             only_winners_count = 0
             normal_count = 0
             dichotomized_count = 0
-            if output_code == AnalysisCode.MIX:
+            if output_code == WinnerAnalysisCode.MIX:
                 # Decrease threshold-window-ratio
-                configuration['ex_sync_threshold'] = round(0.9 * configuration['ex_sync_threshold'])
-                configuration['ex_sync_window'] = round(1.1 * configuration['ex_sync_window'])
-            elif output_code == AnalysisCode.NO_JUMP:
+                '''configuration['ex_sync_threshold'] = min(configuration['ex_sync_threshold']-1,round(0.9 * configuration['ex_sync_threshold']))
+                configuration['ex_sync_window'] = max(configuration['ex_sync_window']+1,round(1.1 * configuration['ex_sync_window']))'''
+                # Do nothing
+            elif output_code == WinnerAnalysisCode.NO_JUMP:
                 # Need to increase Z_in
                 configuration['Z_in'] = 1.1 * configuration['Z_in']
-            elif output_code == AnalysisCode.LOSERS_AFTER_JUMP:
+            elif output_code == WinnerAnalysisCode.LOSERS_AFTER_JUMP:
                 # Decrease threshold-window-ratio
-                configuration['ex_sync_threshold'] = round(0.9 * configuration['ex_sync_threshold'])
-                configuration['ex_sync_window'] = round(1.1 * configuration['ex_sync_window'])
-            elif output_code == AnalysisCode.WINNERS_BEFORE_JUMP:
+                configuration['ex_sync_threshold'] = min(configuration['ex_sync_threshold']-1,round(0.9 * configuration['ex_sync_threshold']))
+                configuration['ex_sync_window'] = max(configuration['ex_sync_window']+1,round(1.1 * configuration['ex_sync_window']))
+            elif output_code == WinnerAnalysisCode.WINNERS_BEFORE_JUMP:
+                # Increase threshold-window-ratio
+                configuration['ex_sync_threshold'] = max(configuration['ex_sync_threshold']+1,round(1.1 * configuration['ex_sync_threshold']))
+                configuration['ex_sync_window'] = min(configuration['ex_sync_window']-1,round(0.9 * configuration['ex_sync_window']))
+            elif output_code == WinnerAnalysisCode.MULTIPLE_JUMP:
                 # Need to increase sync_threshold
-                configuration['ex_sync_threshold'] = round(1.1 * configuration['ex_sync_threshold'])
-            elif output_code == AnalysisCode.MULTIPLE_JUMP:
-                # Need to increase sync_threshold
-                configuration['ex_sync_threshold'] = round(1.1 * configuration['ex_sync_threshold'])
+                configuration['ex_sync_threshold'] = max(configuration['ex_sync_threshold']+1,round(1.1 * configuration['ex_sync_threshold']))
         else: # We got a dichotomized code
             dichotomized_count += 1
-            if output_code == AnalysisCode.ONLY_LOSERS:
+            if output_code == WinnerAnalysisCode.ONLY_LOSERS:
                 only_losers_count += 1
-            elif output_code == AnalysisCode.ONLY_WINNERS:
+            elif output_code == WinnerAnalysisCode.ONLY_WINNERS:
                 only_winners_count += 1
-            elif output_code == AnalysisCode.NORMAL:
+            elif output_code == WinnerAnalysisCode.NORMAL:
                 normal_count += 1
         
         ''' If we had a sequence of 5 dichotomized codes in a row("a window"), that means we're
@@ -922,8 +930,8 @@ def extract_parameters(configuration):
         if dichotomized_count == 5:
             if only_losers_count > 2:
                 # Need to increase sync_window and Z_ob_to_ac, and decrease sync_threshold
-                configuration['ex_sync_threshold'] = round(0.9 * configuration['ex_sync_threshold'])
-                configuration['ex_sync_window'] = round(1.1 * configuration['ex_sync_window'])
+                configuration['ex_sync_threshold'] = min(configuration['ex_sync_threshold']-1,round(0.9 * configuration['ex_sync_threshold']))
+                configuration['ex_sync_window'] = max(configuration['ex_sync_window']+1,round(1.1 * configuration['ex_sync_window']))
                 configuration['Z_ll_ob_to_ll_ac'] = 1.1 * configuration['Z_ll_ob_to_ll_ac']
             elif only_winners_count > 2:
                 # Need to increase Z_in, and decrease Z_ob_to_ac
@@ -936,7 +944,7 @@ def extract_parameters(configuration):
             normal_count = 0
             dichotomized_count = 0
             
-    if i == max_iter_num:
+    if i == max_iter_num-1:
         print('Unable to extract parameters')
         assert(False)
     
@@ -1033,5 +1041,5 @@ plt.plot(range(epoch_num), scores)
 plt.savefig('res')'''
 
 configuration = {}
-extract_parameters(configuration)
+extract_parameters_according_to_comp_resolution(configuration)
 print(configuration)
