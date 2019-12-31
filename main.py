@@ -46,8 +46,10 @@ gamma_in = 0.14
 active_ll_ob_threshold = excitatory_threshold/20
 layer_num = 5
 winner_window_len = 10
-#response_layer = layer_num-1
-response_layer = 0
+response_layer = layer_num-1
+#response_layer = 1
+
+default_competition_len = 10000
 
 # Normalization constants
 Z_ex = excitatory_threshold * 2
@@ -470,7 +472,7 @@ class ModelClass:
                     break
                 
             t += 1
-            if not stop_when_resolved and t == 50000:
+            if not stop_when_resolved and t == default_competition_len:
                 break
         
         if not self.quiet:
@@ -793,6 +795,11 @@ class WinnerAnalysisCode(enum.Enum):
     WINNERS_BEFORE_JUMP = 6 # Increase threshold-window-ratio
     MULTIPLE_JUMP = 7 # Need to increase sync_threshold
 
+class FireHistoryAnalysisCode(enum.Enum):
+    NORMAL = 0
+    LOW_FIRING_RATE = 1
+    HIGH_FIRING_RATE = 2
+
 jump_factor = 2
 jump_diff = 10
 jump_compare_factor = 2
@@ -801,6 +808,7 @@ non_dichotomized_codes = [WinnerAnalysisCode.MIX,
                           WinnerAnalysisCode.LOSERS_AFTER_JUMP,
                           WinnerAnalysisCode.WINNERS_BEFORE_JUMP,
                           WinnerAnalysisCode.MULTIPLE_JUMP]
+high_firing_rate_threshold = 0.01
 
 def analyze_competition(winner_list, competitiors_fire_history):
     competitiors_fire_count = [len(x) for x in competitiors_fire_history]
@@ -847,8 +855,50 @@ def analyze_competition(winner_list, competitiors_fire_history):
     
     return WinnerAnalysisCode.NORMAL
 
+def analyze_fire_history(competitiors_fire_history, competition_len):
+    competitiors_fire_count = [len(x) for x in competitiors_fire_history]
+    print('\tFire count: ' + str(competitiors_fire_count))
+    sorted_indices = sorted(range(len(competitiors_fire_count)), key=lambda k: competitiors_fire_count[k])
+    
+    jumps = []
+    # Collect jumps
+    for i in range(len(sorted_indices)-1):
+        smaller = competitiors_fire_count[sorted_indices[i]]
+        bigger = competitiors_fire_count[sorted_indices[i+1]]
+        if bigger > (smaller * jump_factor) and bigger > (smaller + jump_diff):
+            # Jump
+            jumps.append((i,bigger-smaller))
+    
+    # Make sure one jump is much bigger than the rest
+    while True:
+        jumps.sort(key=lambda x:x[1])
+        if len(jumps) == 0:
+            # No jumps
+            break
+        if len(jumps) > 1:
+            if jumps[-1][1] < jump_compare_factor*jumps[-2][1]:
+            # The biggest jump is not significantly bigger than the rest of the jumps
+                break
+        return FireHistoryAnalysisCode.NORMAL
+    
+    # If we got here the jumps are incorrect. Need to understand the rate of the firing
+    firing_rate_average = np.mean(competitiors_fire_count)
+    if firing_rate_average > high_firing_rate_threshold * competition_len:
+        return FireHistoryAnalysisCode.HIGH_FIRING_RATE
+    else:
+        return FireHistoryAnalysisCode.LOW_FIRING_RATE
+
+def change_natural_number_by_factor(num, factor):
+    if factor > 1:
+        return max(num+1,round(factor * num))
+    elif factor == 1:
+        return num
+    else:
+        return max(1,min(num-1,round(factor * num)))
+    
+
 def extract_parameters_according_to_comp_resolution(configuration):
-    print('Starting parameters extraction tool...')
+    print('Starting parameters extraction according to competition resolution tool...')
     
     configuration['quiet'] = True
     '''configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 11
@@ -896,23 +946,23 @@ def extract_parameters_according_to_comp_resolution(configuration):
             dichotomized_count = 0
             if output_code == WinnerAnalysisCode.MIX:
                 # Decrease threshold-window-ratio
-                '''configuration['ex_sync_threshold'] = min(configuration['ex_sync_threshold']-1,round(0.9 * configuration['ex_sync_threshold']))
-                configuration['ex_sync_window'] = max(configuration['ex_sync_window']+1,round(1.1 * configuration['ex_sync_window']))'''
+                '''configuration['ex_sync_threshold'] = change_natural_number_by_factor(configuration['ex_sync_threshold'],0.9)
+                configuration['ex_sync_window'] = change_natural_number_by_factor(configuration['ex_sync_window'],1.1)'''
                 # Do nothing
             elif output_code == WinnerAnalysisCode.NO_JUMP:
                 # Need to increase Z_in
                 configuration['Z_in'] = 1.1 * configuration['Z_in']
             elif output_code == WinnerAnalysisCode.LOSERS_AFTER_JUMP:
                 # Decrease threshold-window-ratio
-                configuration['ex_sync_threshold'] = min(configuration['ex_sync_threshold']-1,round(0.9 * configuration['ex_sync_threshold']))
-                configuration['ex_sync_window'] = max(configuration['ex_sync_window']+1,round(1.1 * configuration['ex_sync_window']))
+                configuration['ex_sync_threshold'] = change_natural_number_by_factor(configuration['ex_sync_threshold'],0.9)
+                configuration['ex_sync_window'] = change_natural_number_by_factor(configuration['ex_sync_window'],1.1)
             elif output_code == WinnerAnalysisCode.WINNERS_BEFORE_JUMP:
                 # Increase threshold-window-ratio
-                configuration['ex_sync_threshold'] = max(configuration['ex_sync_threshold']+1,round(1.1 * configuration['ex_sync_threshold']))
-                configuration['ex_sync_window'] = min(configuration['ex_sync_window']-1,round(0.9 * configuration['ex_sync_window']))
+                configuration['ex_sync_threshold'] = change_natural_number_by_factor(configuration['ex_sync_threshold'],1.1)
+                configuration['ex_sync_window'] = change_natural_number_by_factor(configuration['ex_sync_window'],0.9)
             elif output_code == WinnerAnalysisCode.MULTIPLE_JUMP:
                 # Need to increase sync_threshold
-                configuration['ex_sync_threshold'] = max(configuration['ex_sync_threshold']+1,round(1.1 * configuration['ex_sync_threshold']))
+                configuration['ex_sync_threshold'] = change_natural_number_by_factor(configuration['ex_sync_threshold'],1.1)
         else: # We got a dichotomized code
             dichotomized_count += 1
             if output_code == WinnerAnalysisCode.ONLY_LOSERS:
@@ -930,8 +980,8 @@ def extract_parameters_according_to_comp_resolution(configuration):
         if dichotomized_count == 5:
             if only_losers_count > 2:
                 # Need to increase sync_window and Z_ob_to_ac, and decrease sync_threshold
-                configuration['ex_sync_threshold'] = min(configuration['ex_sync_threshold']-1,round(0.9 * configuration['ex_sync_threshold']))
-                configuration['ex_sync_window'] = max(configuration['ex_sync_window']+1,round(1.1 * configuration['ex_sync_window']))
+                configuration['ex_sync_threshold'] = change_natural_number_by_factor(configuration['ex_sync_threshold'],0.9)
+                configuration['ex_sync_window'] = change_natural_number_by_factor(configuration['ex_sync_window'],1.1)
                 configuration['Z_ll_ob_to_ll_ac'] = 1.1 * configuration['Z_ll_ob_to_ll_ac']
             elif only_winners_count > 2:
                 # Need to increase Z_in, and decrease Z_ob_to_ac
@@ -943,6 +993,92 @@ def extract_parameters_according_to_comp_resolution(configuration):
             only_winners_count = 0
             normal_count = 0
             dichotomized_count = 0
+            
+    if i == max_iter_num-1:
+        print('Unable to extract parameters')
+        assert(False)
+    
+    print('Extracted parameters successfully!')
+    
+def extract_parameters_general(configuration):
+    print('Starting parameters extraction general tool...')
+    
+    configuration['quiet'] = True
+    #configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 12
+    configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 8
+    configuration['ex_sync_window'] = 95
+    configuration['ex_sync_threshold'] = 6
+    configuration['ex_unsync_threshold'] = 1
+    #configuration['Z_ll_ob_to_ll_ac'] = 0.3 * Z_ex
+    configuration['Z_ll_ob_to_ll_ac'] = 0.6 * Z_ex
+    
+    normal_count = 0
+    low_firing_rate_count = 0
+    high_firing_rate_count = 0
+    window_len = 6
+    good_parameters_threshold = 4
+    
+    max_iter_num = 100
+    for i in range(max_iter_num):
+        print('Starting iteration #' + str(i))
+        print('\t' + str(configuration))
+        
+        starting_loc = (0,0)
+        while starting_loc == (0,0):
+            starting_loc = (int(np.random.rand() * world_height), int(np.random.rand() * world_length))
+        world = init_world(world_height, world_length, [((0,0),1)])
+        initial_player = (starting_loc[0],starting_loc[1],0)
+        goals = [(24,25)]
+        action_begin_loc = ll_ob_num+hl_ob_num
+        
+        model = ModelClass(configuration)
+        model.initialize(False)
+        
+        input_vec = generate_state_from_simulator(world, initial_player, goals)
+        _, competition_len, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,False)
+        output_code = analyze_fire_history(fire_history[response_layer][action_begin_loc:action_begin_loc+ll_ac_num], competition_len)
+        
+        print('\tOutput code: ' + str(output_code))
+        
+        if output_code == FireHistoryAnalysisCode.NORMAL:
+            normal_count += 1
+        elif output_code == FireHistoryAnalysisCode.LOW_FIRING_RATE:
+            low_firing_rate_count +=1
+        elif output_code == FireHistoryAnalysisCode.HIGH_FIRING_RATE:
+            high_firing_rate_count +=1
+        
+        if normal_count == good_parameters_threshold:
+            # Extract good parameters
+            break
+        
+        if low_firing_rate_count > (window_len - good_parameters_threshold):
+            # Low firing rate- we need to fix the problem
+            print('Firing rate is too low- changing parameters')
+            configuration['Z_in'] = 0.9 * configuration['Z_in']
+            configuration['Z_ll_ob_to_ll_ac'] = 1.1 * configuration['Z_ll_ob_to_ll_ac']
+            
+            normal_count = 0
+            low_firing_rate_count = 0
+            high_firing_rate_count = 0
+            
+        if high_firing_rate_count > (window_len - good_parameters_threshold):
+            # High firing rate- we need to fix the problem
+            print('Firing rate is too high- changing parameters')
+            configuration['Z_in'] = 1.1 * configuration['Z_in']
+            configuration['Z_ll_ob_to_ll_ac'] = 0.9 * configuration['Z_ll_ob_to_ll_ac']
+            
+            normal_count = 0
+            low_firing_rate_count = 0
+            high_firing_rate_count = 0
+        
+        if low_firing_rate_count > 1 and high_firing_rate_count > 1:
+            # No separation. We need more inhibition
+            print('Firing rates are not separated- changing parameters')
+            configuration['Z_in'] = 1.2 * configuration['Z_in']
+            
+            normal_count = 0
+            low_firing_rate_count = 0
+            high_firing_rate_count = 0
             
     if i == max_iter_num-1:
         print('Unable to extract parameters')
@@ -1041,5 +1177,5 @@ plt.plot(range(epoch_num), scores)
 plt.savefig('res')'''
 
 configuration = {}
-extract_parameters_according_to_comp_resolution(configuration)
+extract_parameters_general(configuration)
 print(configuration)
