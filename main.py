@@ -49,7 +49,7 @@ winner_window_len = 10
 response_layer = layer_num-1
 #response_layer = 1
 
-default_competition_len = 10000
+default_competition_len = 20000
 
 # Normalization constants
 Z_ex = excitatory_threshold * 2
@@ -861,14 +861,14 @@ def analyze_fire_history(competitiors_fire_history, competition_len):
     sorted_indices = sorted(range(len(competitiors_fire_count)), key=lambda k: competitiors_fire_count[k])
     
     jumps = []
-    # Collect jumps
+    # Collect jumps and general diffs
     for i in range(len(sorted_indices)-1):
         smaller = competitiors_fire_count[sorted_indices[i]]
         bigger = competitiors_fire_count[sorted_indices[i+1]]
         if bigger > (smaller * jump_factor) and bigger > (smaller + jump_diff):
             # Jump
             jumps.append((i,bigger-smaller))
-    
+        
     # Make sure one jump is much bigger than the rest
     while True:
         jumps.sort(key=lambda x:x[1])
@@ -1086,6 +1086,64 @@ def extract_parameters_general(configuration):
     
     print('Extracted parameters successfully!')
 
+def evaluate_Z_in_separation_correlation():
+    print('Starting Z_in-separation correlation evaluation tool...')
+    
+    configuration = {}
+    configuration['quiet'] = True
+    configuration['ex_sync_window'] = 95
+    configuration['ex_sync_threshold'] = 6
+    configuration['ex_unsync_threshold'] = 1
+    sample_num = 100
+    
+    diff_size_averages = []
+    Z_in_factors = [x/2 for x in range(12,28)]
+    for Z_in_factor in Z_in_factors:
+        configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * Z_in_factor
+        print('Trying Z_in == ' + str(configuration['Z_in']) + '...')
+        configuration['Z_ll_ob_to_ll_ac'] = ((Z_in_factor-5)*0.06) * Z_ex
+        normal_count = 0
+        diff_size_sum = 0
+        while normal_count < sample_num:
+            starting_loc = (0,0)
+            while starting_loc == (0,0):
+                starting_loc = (int(np.random.rand() * world_height), int(np.random.rand() * world_length))
+            world = init_world(world_height, world_length, [((0,0),1)])
+            initial_player = (starting_loc[0],starting_loc[1],0)
+            goals = [(24,25)]
+            action_begin_loc = ll_ob_num+hl_ob_num
+            
+            model = ModelClass(configuration)
+            model.initialize(False)
+            
+            input_vec = generate_state_from_simulator(world, initial_player, goals)
+            _, competition_len, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,False)
+            
+            fire_count = [len(x) for x in fire_history[response_layer][action_begin_loc:action_begin_loc+ll_ac_num]]
+            average_fire_count = np.mean(fire_count)
+            if average_fire_count < (high_firing_rate_threshold-0.005)*competition_len:
+                configuration['Z_ll_ob_to_ll_ac'] = 1.1*configuration['Z_ll_ob_to_ll_ac']
+            elif average_fire_count > (high_firing_rate_threshold+0.005)*competition_len:
+                configuration['Z_ll_ob_to_ll_ac'] = 0.9*configuration['Z_ll_ob_to_ll_ac']
+            else:
+                normal_count += 1
+                if normal_count % 10 == 0:
+                    print('Collected ' + str(normal_count) + ' out of ' + str(sample_num))
+                biggest_diff_size = 0
+                fire_count.sort()
+                for i in range(len(fire_count)-1):
+                    if fire_count[i+1]-fire_count[i] > biggest_diff_size:
+                        biggest_diff_size = fire_count[i+1]-fire_count[i]
+                diff_size_sum += biggest_diff_size
+                
+        diff_size_average = diff_size_sum / sample_num
+        print('Diff size average: ' + str(diff_size_average))
+        diff_size_averages.append(diff_size_average)
+        
+    print('Finished!')
+    plt.plot(Z_in_factors, diff_size_averages)
+    plt.show()
+
 #############
 # Main code #
 #############
@@ -1176,6 +1234,7 @@ for epoch in range(epoch_num):
 plt.plot(range(epoch_num), scores)
 plt.savefig('res')'''
 
-configuration = {}
-extract_parameters_general(configuration)
-print(configuration)
+#configuration = {}
+#extract_parameters_general(configuration)
+#print(configuration)
+evaluate_Z_in_separation_correlation()
