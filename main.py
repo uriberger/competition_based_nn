@@ -111,6 +111,10 @@ class ModelClass:
         self.ex_unsync_threshold = configuration['ex_unsync_threshold']
         self.Z_ll_ob_to_ll_ac = configuration['Z_ll_ob_to_ll_ac']
         self.quiet = configuration['quiet']
+        
+    def my_print(self, str):
+        if not self.quiet:
+            print(str)
 
     def save_synapse_strength(self):
         # Save the synapse strength matrix to a file.
@@ -408,8 +412,12 @@ class ModelClass:
                 '''top_level_action_begin = ll_ob_num+hl_ob_num+ll_ac_num+ml_ac_num
                 synapse_strength[post_layer][pre_layer][top_level_action_begin:top_level_action_begin+tl_ac_num,:] = 0'''
         
-    def calculate_winners(self, input_vec, begin_ind, node_num,stop_when_resolved=True):
+    def calculate_winners(self, input_vec, begin_ind, node_num,stop_when_reach_def_comp_len,stop_when_resolved):
         fire_history = []
+        
+        # Stopping criterion
+        need_to_wait_for_def_comp_len = stop_when_reach_def_comp_len
+        need_to_wait_for_comp_resolution = stop_when_resolved
         
         # Given an input, simulate the dynamics of the system, for iter_num time steps
         for _ in range(layer_num):
@@ -423,60 +431,65 @@ class ModelClass:
             
         t = 0
         while True:
-            if not self.quiet and t % 1000 == 0:
-                print('t='+str(t))
+            if t % 1000 == 0:
+                self.my_print('t='+str(t))
             
+            # Propagate external input
             self.prop_external_input(input_vec)
+            
+            # Document fire history
             for l in range(layer_num):
                 for unit_ind in range(unit_num):
                     if prev_act[l][unit_ind, 0] == 1:
                         fire_history[l][unit_ind].append(t)
-                 
-            if len(synched_iins) == 0:       
-                for first_iin in range(unit_num-iin_num, unit_num):
-                    for second_iin in range(first_iin+1, unit_num):
-                        # Check if iins where synched in the last sync window
-                        iin_sync_window = 20
-                        iin_sync_threshold = 15
-                        
-                        if len(fire_history[response_layer][first_iin]) < iin_sync_window or len(fire_history[response_layer][second_iin]) < iin_sync_window:
-                            # Not enough firing- still can't determine synchronization
-                            continue
-                        intersection_of_last_window = [x for x in fire_history[response_layer][first_iin][-iin_sync_window:] if x in fire_history[response_layer][second_iin][-iin_sync_window:]]
-                        if len(intersection_of_last_window) >= iin_sync_threshold:
-                            synched_iins = [first_iin, second_iin]
+            if need_to_wait_for_comp_resolution:            
+                if len(synched_iins) == 0:       
+                    for first_iin in range(unit_num-iin_num, unit_num):
+                        for second_iin in range(first_iin+1, unit_num):
+                            # Check if iins where synched in the last sync window
+                            iin_sync_window = 20
+                            iin_sync_threshold = 15
+                            
+                            if len(fire_history[response_layer][first_iin]) < iin_sync_window or len(fire_history[response_layer][second_iin]) < iin_sync_window:
+                                # Not enough firing- still can't determine synchronization
+                                continue
+                            intersection_of_last_window = [x for x in fire_history[response_layer][first_iin][-iin_sync_window:] if x in fire_history[response_layer][second_iin][-iin_sync_window:]]
+                            if len(intersection_of_last_window) >= iin_sync_threshold:
+                                synched_iins = [first_iin, second_iin]
+                                break
+                        if len(synched_iins) > 0:
+                            # IINs are synched
+                            sync_time_step = t
+                            self.my_print('sync time step: ' + str(t))
                             break
-                    if len(synched_iins) > 0:
-                        sync_time_step = t
-                        if not self.quiet:
-                            print('sync time step: ' + str(t))
-                        break
-            elif t > sync_time_step+2000:
-                competition_resolved = True
-                
-                iin_firing = set().union(*([[x for x in fire_history[response_layer][iin_ind] if x > t-self.ex_sync_window*10] for iin_ind in range(unit_num-iin_num,unit_num)]))
-                for unit_ind in range(begin_ind, begin_ind+node_num):
-                    winner_loser_ind = unit_ind - begin_ind
-                    if winner_loser_list[winner_loser_ind] != -1:
-                        continue # resolved
-                    ex_intersection_of_last_window = [x for x in fire_history[response_layer][unit_ind][-self.ex_sync_window:] if x in iin_firing]
-                    #ex_intersection_of_last_window = [x for x in fire_history[response_layer][unit_ind][-ex_sync_window:] if (x in iin_firing or (x+1) in iin_firing)]
-                    if len(ex_intersection_of_last_window) >= self.ex_sync_threshold:
-                        winner_loser_list[winner_loser_ind] = 1 # winner
-                    elif len(ex_intersection_of_last_window) <= self.ex_unsync_threshold:
-                        winner_loser_list[winner_loser_ind] = 0 # lower
-                    else:
-                        competition_resolved = False # unresolved yet
-                        
-                if stop_when_resolved and competition_resolved:
-                    break
+                elif t > sync_time_step+2000:
+                    competition_resolved = True
+                    
+                    iin_firing = set().union(*([[x for x in fire_history[response_layer][iin_ind] if x > t-self.ex_sync_window*10] for iin_ind in range(unit_num-iin_num,unit_num)]))
+                    for unit_ind in range(begin_ind, begin_ind+node_num):
+                        winner_loser_ind = unit_ind - begin_ind
+                        if winner_loser_list[winner_loser_ind] != -1:
+                            continue # resolved
+                        ex_intersection_of_last_window = [x for x in fire_history[response_layer][unit_ind][-self.ex_sync_window:] if x in iin_firing]
+                        if len(ex_intersection_of_last_window) >= self.ex_sync_threshold:
+                            winner_loser_list[winner_loser_ind] = 1 # winner
+                        elif len(ex_intersection_of_last_window) <= self.ex_unsync_threshold:
+                            winner_loser_list[winner_loser_ind] = 0 # loser
+                        else:
+                            competition_resolved = False # unresolved yet
+                            
+                    if competition_resolved:
+                        need_to_wait_for_comp_resolution = False
+                        if not need_to_wait_for_def_comp_len:
+                            break
                 
             t += 1
-            if not stop_when_resolved and t == default_competition_len:
-                break
+            if t == default_competition_len:
+                need_to_wait_for_def_comp_len = False
+                if not need_to_wait_for_comp_resolution:
+                    break
         
-        if not self.quiet:
-            print('winner list firing: ' + str([len(a) for a in fire_history[response_layer][begin_ind:begin_ind+node_num]]))
+        self.my_print('winner list firing: ' + str([len(a) for a in fire_history[response_layer][begin_ind:begin_ind+node_num]]))
         
         return winner_loser_list, t, fire_history
         
@@ -897,20 +910,21 @@ def change_natural_number_by_factor(num, factor):
         return max(1,min(num-1,round(factor * num)))
     
 
-def extract_parameters_according_to_comp_resolution(configuration):
-    print('Starting parameters extraction according to competition resolution tool...')
+def extract_competition_parameters(configuration):
+    print('Starting competition parameters extraction...')
     
-    configuration['quiet'] = True
-    '''configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 11
-    configuration['ex_sync_window'] = 80
-    configuration['ex_sync_threshold'] = 8
-    configuration['ex_unsync_threshold'] = 1
-    configuration['Z_ll_ob_to_ll_ac'] = 0.3 * Z_ex'''
-    configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 12
+    ''' Welcome to the competition parameters extraction tool.
+    Competition parameters are parameters that helps us deciding if the competition was
+    resolved.
+    Our main goal is to find parameters that predict the true winners and losers. The
+    true winners are the neurons with the higher firing rate in the end of the
+    simulation, while our prediction may occur before the end of the simulation.
+    We assume that by the time the function is called we already extracted the brain
+    parameters. '''
+    
     configuration['ex_sync_window'] = 95
     configuration['ex_sync_threshold'] = 6
     configuration['ex_unsync_threshold'] = 1
-    configuration['Z_ll_ob_to_ll_ac'] = 0.3 * Z_ex
     
     only_losers_count = 0
     only_winners_count = 0
@@ -934,7 +948,7 @@ def extract_parameters_according_to_comp_resolution(configuration):
         model.initialize(False)
         
         input_vec = generate_state_from_simulator(world, initial_player, goals)
-        winner_list, _, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True)
+        winner_list, _, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,True)
         output_code = analyze_competition(winner_list, fire_history[response_layer][action_begin_loc:action_begin_loc+ll_ac_num])
         
         print('\tOutput code: ' + str(output_code))
@@ -945,13 +959,13 @@ def extract_parameters_according_to_comp_resolution(configuration):
             normal_count = 0
             dichotomized_count = 0
             if output_code == WinnerAnalysisCode.MIX:
-                # Decrease threshold-window-ratio
-                '''configuration['ex_sync_threshold'] = change_natural_number_by_factor(configuration['ex_sync_threshold'],0.9)
-                configuration['ex_sync_window'] = change_natural_number_by_factor(configuration['ex_sync_window'],1.1)'''
+                # Increase the sync window, keep the threshold-window ratio
+                configuration['ex_sync_threshold'] = change_natural_number_by_factor(configuration['ex_sync_threshold'],1.1)
+                configuration['ex_sync_window'] = change_natural_number_by_factor(configuration['ex_sync_window'],1.1)
                 # Do nothing
             elif output_code == WinnerAnalysisCode.NO_JUMP:
-                # Need to increase Z_in
-                configuration['Z_in'] = 1.1 * configuration['Z_in']
+                # Do nothing
+                '''configuration['Z_in'] = 1.1 * configuration['Z_in']'''
             elif output_code == WinnerAnalysisCode.LOSERS_AFTER_JUMP:
                 # Decrease threshold-window-ratio
                 configuration['ex_sync_threshold'] = change_natural_number_by_factor(configuration['ex_sync_threshold'],0.9)
@@ -979,14 +993,13 @@ def extract_parameters_according_to_comp_resolution(configuration):
         We also demand that there will be at least 3 normal codes in the previous window. ''' 
         if dichotomized_count == 5:
             if only_losers_count > 2:
-                # Need to increase sync_window and Z_ob_to_ac, and decrease sync_threshold
+                # Need to decrease threshold-window ratio
                 configuration['ex_sync_threshold'] = change_natural_number_by_factor(configuration['ex_sync_threshold'],0.9)
                 configuration['ex_sync_window'] = change_natural_number_by_factor(configuration['ex_sync_window'],1.1)
-                configuration['Z_ll_ob_to_ll_ac'] = 1.1 * configuration['Z_ll_ob_to_ll_ac']
             elif only_winners_count > 2:
-                # Need to increase Z_in, and decrease Z_ob_to_ac
-                configuration['Z_in'] = 1.1 * configuration['Z_in']
-                configuration['Z_ll_ob_to_ll_ac'] = 0.9 * configuration['Z_ll_ob_to_ll_ac']
+                # Need to increase threshold-window ratio
+                configuration['ex_sync_threshold'] = change_natural_number_by_factor(configuration['ex_sync_threshold'],1.1)
+                configuration['ex_sync_window'] = change_natural_number_by_factor(configuration['ex_sync_window'],0.9)
             elif normal_count > 2:
                 break
             only_losers_count = 0
@@ -995,22 +1008,29 @@ def extract_parameters_according_to_comp_resolution(configuration):
             dichotomized_count = 0
             
     if i == max_iter_num-1:
-        print('Unable to extract parameters')
+        print('Unable to extract competition parameters')
         assert(False)
     
-    print('Extracted parameters successfully!')
+    print('Extracted competition parameters successfully!')
     
-def extract_parameters_general(configuration):
-    print('Starting parameters extraction general tool...')
+def extract_brain_parameters(configuration):
+    print('Starting brain parameters extraction tool...')
     
-    configuration['quiet'] = True
-    #configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 12
-    configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 8
-    configuration['ex_sync_window'] = 95
-    configuration['ex_sync_threshold'] = 6
-    configuration['ex_unsync_threshold'] = 1
-    #configuration['Z_ll_ob_to_ll_ac'] = 0.3 * Z_ex
-    configuration['Z_ll_ob_to_ll_ac'] = 0.6 * Z_ex
+    ''' Welcome to the brain parameter extraction tool.
+    Brain parameters are parameters that exist in reality, such as the normalization
+    parameters.
+    Our main goal is to find parameters that create good separation between winners and
+    losers, but we want to do it while maximizing Z_in (which is statistically proven to
+    promote good separation). So we start with a very high Z_in, and try it. If it's too
+    high- we'll lower it down and stop when we first see good results. '''
+    configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 20
+    highest_Z_ll_ob_to_ll_ac_possible = 0.6 * Z_ex
+    configuration['Z_ll_ob_to_ll_ac'] = highest_Z_ll_ob_to_ll_ac_possible
+    
+    # Competition parameters- irrelevant for now
+    configuration['ex_sync_window'] = 0
+    configuration['ex_sync_threshold'] = 0
+    configuration['ex_unsync_threshold'] = 0
     
     normal_count = 0
     low_firing_rate_count = 0
@@ -1023,19 +1043,20 @@ def extract_parameters_general(configuration):
         print('Starting iteration #' + str(i))
         print('\t' + str(configuration))
         
+        # Create some random state
         starting_loc = (0,0)
         while starting_loc == (0,0):
             starting_loc = (int(np.random.rand() * world_height), int(np.random.rand() * world_length))
         world = init_world(world_height, world_length, [((0,0),1)])
         initial_player = (starting_loc[0],starting_loc[1],0)
         goals = [(24,25)]
-        action_begin_loc = ll_ob_num+hl_ob_num
         
         model = ModelClass(configuration)
         model.initialize(False)
+        action_begin_loc = ll_ob_num+hl_ob_num
         
         input_vec = generate_state_from_simulator(world, initial_player, goals)
-        _, competition_len, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,False)
+        _, competition_len, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,False)
         output_code = analyze_fire_history(fire_history[response_layer][action_begin_loc:action_begin_loc+ll_ac_num], competition_len)
         
         print('\tOutput code: ' + str(output_code))
@@ -1054,8 +1075,10 @@ def extract_parameters_general(configuration):
         if low_firing_rate_count > (window_len - good_parameters_threshold):
             # Low firing rate- we need to fix the problem
             print('Firing rate is too low- changing parameters')
-            configuration['Z_in'] = 0.9 * configuration['Z_in']
-            configuration['Z_ll_ob_to_ll_ac'] = 1.1 * configuration['Z_ll_ob_to_ll_ac']
+            if configuration['Z_ll_ob_to_ll_ac'] + 0.02 * Z_ex > highest_Z_ll_ob_to_ll_ac_possible:
+                configuration['Z_in'] = configuration['Z_in'] - (iin_num/unit_num) * excitatory_threshold
+            else:
+                configuration['Z_ll_ob_to_ll_ac'] = configuration['Z_ll_ob_to_ll_ac'] + 0.02 * Z_ex
             
             normal_count = 0
             low_firing_rate_count = 0
@@ -1064,8 +1087,8 @@ def extract_parameters_general(configuration):
         if high_firing_rate_count > (window_len - good_parameters_threshold):
             # High firing rate- we need to fix the problem
             print('Firing rate is too high- changing parameters')
-            configuration['Z_in'] = 1.1 * configuration['Z_in']
-            configuration['Z_ll_ob_to_ll_ac'] = 0.9 * configuration['Z_ll_ob_to_ll_ac']
+            configuration['Z_in'] = configuration['Z_in'] + (iin_num/unit_num) * excitatory_threshold
+            configuration['Z_ll_ob_to_ll_ac'] = configuration['Z_ll_ob_to_ll_ac'] - 0.02 * Z_ex
             
             normal_count = 0
             low_firing_rate_count = 0
@@ -1074,17 +1097,25 @@ def extract_parameters_general(configuration):
         if low_firing_rate_count > 1 and high_firing_rate_count > 1:
             # No separation. We need more inhibition
             print('Firing rates are not separated- changing parameters')
-            configuration['Z_in'] = 1.2 * configuration['Z_in']
+            configuration['Z_in'] = configuration['Z_in'] + (iin_num/unit_num) * excitatory_threshold
             
             normal_count = 0
             low_firing_rate_count = 0
             high_firing_rate_count = 0
             
     if i == max_iter_num-1:
-        print('Unable to extract parameters')
+        print('Unable to extract brain parameters')
         assert(False)
     
-    print('Extracted parameters successfully!')
+    print('Extracted brain parameters successfully!')
+
+def extract_parameters(configuration):
+    print('Starting parameters extraction tool...')
+    
+    configuration['quiet'] = True
+    
+    extract_brain_parameters(configuration)
+    extract_competition_parameters(configuration)
 
 def evaluate_Z_in_separation_correlation():
     print('Starting Z_in-separation correlation evaluation tool...')
@@ -1117,7 +1148,7 @@ def evaluate_Z_in_separation_correlation():
             model.initialize(False)
             
             input_vec = generate_state_from_simulator(world, initial_player, goals)
-            _, competition_len, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,False)
+            _, competition_len, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,False)
             
             fire_count = [len(x) for x in fire_history[response_layer][action_begin_loc:action_begin_loc+ll_ac_num]]
             average_fire_count = np.mean(fire_count)
@@ -1184,7 +1215,7 @@ def main(load_from_file, configuration):
         if i > 0:
             model.update_synapse_strength_long_term(winner_list, input_vec, prev_input_vec, comp_len)
         
-        winner_list, comp_len, _ = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num)
+        winner_list, comp_len, _ = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,False,True)
         next_move = model.convert_winner_list_to_action(winner_list)
         if not quiet:
             print('winner list: ' + str(winner_list))
@@ -1234,8 +1265,7 @@ for epoch in range(epoch_num):
 plt.plot(range(epoch_num), scores)
 plt.savefig('res')'''
 
-#configuration = {}
-#extract_parameters_general(configuration)
+configuration = {}
+extract_parameters(configuration)
 #print(configuration)
-evaluate_Z_in_separation_correlation()
-print('a')
+#evaluate_Z_in_separation_correlation()
