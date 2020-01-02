@@ -16,7 +16,7 @@ import enum
 IIN_PROJECTIONS = False
 
 # Fast connection between inhibitory neurons
-IIN_FAST_CONNECTIONS = False
+IIN_FAST_CONNECTIONS_FACTOR = 3
 
 # Connection of inhibitory neurons only to specific excitatory neurons
 SPATIAL_IINS = False
@@ -430,13 +430,18 @@ class ModelClass:
         winner_loser_list = [-1] * node_num
             
         t = 0
+        remaining_inhibitory_iterations = 0
         while True:
             if t % 1000 == 0:
                 self.my_print('t='+str(t))
             
             # Propagate external input
-            self.prop_external_input(input_vec)
-            
+            if remaining_inhibitory_iterations > 0:
+                self.prop_external_input(input_vec,True)
+                remaining_inhibitory_iterations -= 1
+            else:
+                self.prop_external_input(input_vec)
+                remaining_inhibitory_iterations = IIN_FAST_CONNECTIONS_FACTOR-1
             # Document fire history
             for l in range(layer_num):
                 for unit_ind in range(unit_num):
@@ -547,7 +552,7 @@ class ModelClass:
         
         self.fix_synapse_strength()
         
-    def prop_external_input(self, sensory_input_vec):
+    def prop_external_input(self, sensory_input_vec, only_inhibitory=False):
         # Simulate the dynamics of the system for a single time step
         global before_prev_act
         global prev_act
@@ -558,11 +563,13 @@ class ModelClass:
         
         for post_layer in range(layer_num):
             cur_input = np.zeros((unit_num, 1))
-            if post_layer == 0:
+            if post_layer == 0 and not only_inhibitory:
                 input_from_prev_layer = np.pad(sensory_input_vec, ((0,unit_num-ll_ob_num),(0,0)), 'constant')
                 cur_input = np.add(cur_input, input_from_prev_layer)
             for pre_layer in range(layer_num):
                 input_from_pre_layer = np.matmul(synapse_strength[post_layer][pre_layer], prev_act[pre_layer])
+                if only_inhibitory:
+                    input_from_pre_layer[:-iin_num,0] = 0
                 cur_input = np.add(cur_input, input_from_pre_layer)
             
             '''if post_layer == layer_num-1:
@@ -578,6 +585,9 @@ class ModelClass:
             
             # Make sure the input is non-negative
             cur_input = np.where(cur_input>=0, cur_input, 0)
+            if only_inhibitory:
+                # Excitatory neurons doesn't change in an only-inhibitory stage
+                cur_input[:-iin_num] = prev_input[post_layer][:-iin_num]
             
             cur_act = np.concatenate((self.excitatory_activation_function(cur_input[:cur_input.shape[0]-iin_num,[0]]),
                                   self.inhibitory_activation_function(cur_input[cur_input.shape[0]-iin_num:,[0]])),
@@ -1188,8 +1198,6 @@ def main(load_from_file, configuration):
     initial_player = (starting_loc[0],starting_loc[1],0)
     goals = [(24,25)]
     
-    configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 11
-    
     model = ModelClass(configuration)
     model.initialize(load_from_file)
     
@@ -1266,6 +1274,10 @@ plt.plot(range(epoch_num), scores)
 plt.savefig('res')'''
 
 configuration = {}
-extract_parameters(configuration)
-#print(configuration)
-#evaluate_Z_in_separation_correlation()
+configuration['quiet'] = False
+configuration['ex_sync_window'] = 95
+configuration['ex_sync_threshold'] = 6
+configuration['ex_unsync_threshold'] = 1
+configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 20
+configuration['Z_ll_ob_to_ll_ac'] = 0.6 * Z_ex
+main(False,configuration)
