@@ -43,7 +43,6 @@ eta = 0.0001
 comp_len_zeta_ratio = 1500
 gamma_ex = 0.05
 gamma_in = 0.14
-active_ll_ob_threshold = excitatory_threshold/20
 layer_num = 5
 winner_window_len = 10
 response_layer = layer_num-1
@@ -112,9 +111,9 @@ class ModelClass:
         self.Z_ll_ob_to_ll_ac = configuration['Z_ll_ob_to_ll_ac']
         self.quiet = configuration['quiet']
         
-    def my_print(self, str):
+    def my_print(self, my_str):
         if not self.quiet:
-            print(str)
+            print(my_str)
 
     def save_synapse_strength(self):
         # Save the synapse strength matrix to a file.
@@ -805,7 +804,7 @@ def evaluate(world, goals, cur_player, iter_num, shortest_path_len, max_rounds_n
         return 0.5 - 0.5 * (my_dist/max_possible_dist)
 
 #############################
-# Parameter extraction tool #
+# Parameter calibration tool #
 #############################
 
 class WinnerAnalysisCode(enum.Enum):
@@ -920,16 +919,16 @@ def change_natural_number_by_factor(num, factor):
         return max(1,min(num-1,round(factor * num)))
     
 
-def extract_competition_parameters(configuration):
-    print('Starting competition parameters extraction...')
+def calibrate_competition_parameters(configuration):
+    print('Starting competition parameters calibration...')
     
-    ''' Welcome to the competition parameters extraction tool.
+    ''' Welcome to the competition parameters calibration tool.
     Competition parameters are parameters that helps us deciding if the competition was
     resolved.
     Our main goal is to find parameters that predict the true winners and losers. The
     true winners are the neurons with the higher firing rate in the end of the
     simulation, while our prediction may occur before the end of the simulation.
-    We assume that by the time the function is called we already extracted the brain
+    We assume that by the time the function is called we already calibrated the brain
     parameters. '''
     
     configuration['ex_sync_window'] = 95
@@ -1018,15 +1017,15 @@ def extract_competition_parameters(configuration):
             dichotomized_count = 0
             
     if i == max_iter_num-1:
-        print('Unable to extract competition parameters')
+        print('Unable to calibrate competition parameters')
         assert(False)
     
-    print('Extracted competition parameters successfully!')
+    print('Calibrated competition parameters successfully!')
     
-def extract_brain_parameters(configuration):
-    print('Starting brain parameters extraction tool...')
+def calibrate_brain_parameters(configuration):
+    print('Starting brain parameters calibration tool...')
     
-    ''' Welcome to the brain parameter extraction tool.
+    ''' Welcome to the brain parameter calibration tool.
     Brain parameters are parameters that exist in reality, such as the normalization
     parameters.
     Our main goal is to find parameters that create good separation between winners and
@@ -1079,7 +1078,7 @@ def extract_brain_parameters(configuration):
             high_firing_rate_count +=1
         
         if normal_count == good_parameters_threshold:
-            # Extract good parameters
+            # calibrated good parameters
             break
         
         if low_firing_rate_count > (window_len - good_parameters_threshold):
@@ -1114,18 +1113,18 @@ def extract_brain_parameters(configuration):
             high_firing_rate_count = 0
             
     if i == max_iter_num-1:
-        print('Unable to extract brain parameters')
+        print('Unable to calibrate brain parameters')
         assert(False)
     
-    print('Extracted brain parameters successfully!')
+    print('Calibrated brain parameters successfully!')
 
-def extract_parameters(configuration):
-    print('Starting parameters extraction tool...')
+def calibrate_parameters(configuration):
+    print('Starting parameters calibration tool...')
     
     configuration['quiet'] = True
     
-    extract_brain_parameters(configuration)
-    extract_competition_parameters(configuration)
+    calibrate_brain_parameters(configuration)
+    calibrate_competition_parameters(configuration)
 
 def evaluate_Z_in_separation_correlation():
     print('Starting Z_in-separation correlation evaluation tool...')
