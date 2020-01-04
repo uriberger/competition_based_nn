@@ -386,21 +386,21 @@ tested_values_dic = {
 # We now list the parameters to be tested
 tested_parameters_list = [
 #    'Z_ex',
-    'Z_inhib',
+#    'Z_inhib',
 #    'Z_from_inp',
 #    'Z_inter_layer',
 #    'excitatory_precentage',
 #    'inp_num',
 #    'out_num',
 #    'excitatory_threshold',
-#    'inhibitory_threshold',
+    'inhibitory_threshold',
 #    'eta',
 #    'gamma_ex',
 #    'gamma_in'
     ]
 
 varied_parameters_list = [
-    'Z_ex',
+#    'Z_ex',
 #    'Z_inhib',
 #    'Z_from_inp',
 #    'Z_inter_layer',
@@ -408,15 +408,15 @@ varied_parameters_list = [
 #    'excitatory_threshold',
 #    'inhibitory_threshold',
 #    'gamma_ex',
-#    'gamma_in'
+    'gamma_in'
     ]
 
 result_dic = {}
 
 # Finally, the actualy testing
-result_log_fp = open('result.txt','w')
 for tested_parameter in tested_parameters_list:
     for varied_parameter in varied_parameters_list:
+        result_log_fp = open('result_' + tested_parameter + '_' + varied_parameter + '.txt','w')
         if tested_parameter == varied_parameter:
             continue
         print('Testing ' + tested_parameter + ', varying ' + varied_parameter)
@@ -446,5 +446,6 @@ for tested_parameter in tested_parameters_list:
         configuration[varied_parameter] = varied_parameter_orig_value
         
         result_dic[tested_parameter+'_'+varied_parameter] = (biggest_diff_averages, cluster_diff_averages, variance_averages)
+        np.save('result_'+tested_parameter+'_'+varied_parameter,[biggest_diff_averages, cluster_diff_averages, variance_averages])
         
 np.save('result_dic',[result_dic])
