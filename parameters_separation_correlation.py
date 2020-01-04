@@ -385,8 +385,8 @@ tested_values_dic = {
 
 # We now list the parameters to be tested
 tested_parameters_list = [
-    'Z_ex',
-#    'Z_inhib',
+#    'Z_ex',
+    'Z_inhib',
 #    'Z_from_inp',
 #    'Z_inter_layer',
 #    'excitatory_precentage',
@@ -400,8 +400,8 @@ tested_parameters_list = [
     ]
 
 varied_parameters_list = [
-#    'Z_ex',
-    'Z_inhib',
+    'Z_ex',
+#    'Z_inhib',
 #    'Z_from_inp',
 #    'Z_inter_layer',
 #    'excitatory_precentage',
@@ -414,11 +414,14 @@ varied_parameters_list = [
 result_dic = {}
 
 # Finally, the actualy testing
+result_log_fp = open('result.txt','w')
 for tested_parameter in tested_parameters_list:
     for varied_parameter in varied_parameters_list:
         if tested_parameter == varied_parameter:
             continue
         print('Testing ' + tested_parameter + ', varying ' + varied_parameter)
+        result_log_fp.write('Testing ' + tested_parameter + ', varying ' + varied_parameter + '\n')
+        result_log_fp.flush()
         increase_decrease_functions = increase_decrease_functions_dic[varied_parameter]
         tested_values = tested_values_dic[tested_parameter]
         
@@ -432,6 +435,9 @@ for tested_parameter in tested_parameters_list:
             print('\tTrying ' + tested_parameter + '=' + str(tested_value))
             configuration[tested_parameter] = tested_value
             biggest_diff_average, cluster_diff_average, variance_average = simulate_with_configuration(configuration, increase_decrease_functions[0],increase_decrease_functions[1])
+            print('\tGot biggest diff ' + str(biggest_diff_average) + ', cluster diff ' + str(cluster_diff_average) + ', variance ' + str(variance_average))
+            result_log_fp.write('\t' + str(tested_value) + ': biggest diff ' + str(biggest_diff_average) + ', cluster diff ' + str(cluster_diff_average) + ', variance ' + str(variance_average) + '\n')
+            result_log_fp.flush()
             biggest_diff_averages.append(biggest_diff_average)
             cluster_diff_averages.append(cluster_diff_average)
             variance_averages.append(variance_average)
