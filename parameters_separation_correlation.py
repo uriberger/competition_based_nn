@@ -2,7 +2,7 @@ import numpy as np
 
 layer_num = 1
 comp_len = 20000
-sample_num = 100
+sample_num = 1000
 normal_firing_rate = 0.005
 
 class ModelClass:
@@ -214,13 +214,13 @@ def simulate_with_configuration(configuration, increase_firing_rate, decrease_fi
     cluster_diffs = []
     variances = []
     
-    normal_count = 0
     iter_count = 0
-    while normal_count < sample_num:
+    got_normal_average = False
+    while not got_normal_average:
         model = ModelClass(configuration)
         
         if iter_count % 100 == 0:
-            model.my_print('\t\titer count: ' + str(iter_count))
+            model.my_print('\t\tCalibration iter count: ' + str(iter_count))
         
         # Generate random input
         input_vec = model.generate_random_input_vec()
@@ -236,17 +236,19 @@ def simulate_with_configuration(configuration, increase_firing_rate, decrease_fi
             model.my_print('\t\tFire count too high, decreasing')
             decrease_firing_rate(configuration)
         else:
-            normal_count += 1
-            if normal_count % 10 == 0:
-                model.my_print('\t\tCollected ' + str(normal_count) + ' out of ' + str(sample_num))
-            
-            # Run statistics on fire count
-            biggest_diff, cluster_diff, variance = run_statistics(fire_count)
-            biggest_diffs.append(biggest_diff)
-            cluster_diffs.append(cluster_diff)
-            variances.append(variance)
+            got_normal_average = True
             
         iter_count += 1
+            
+    for iter_count in range(sample_num):
+        if iter_count % 100 == 0:
+            model.my_print('\t\tData collection iter count: ' + str(iter_count))
+        
+        # Run statistics on fire count
+        biggest_diff, cluster_diff, variance = run_statistics(fire_count)
+        biggest_diffs.append(biggest_diff)
+        cluster_diffs.append(cluster_diff)
+        variances.append(variance)
     
     biggest_diff_average = sum(biggest_diffs)/sample_num
     cluster_diff_average = sum(cluster_diffs)/sample_num
@@ -385,7 +387,7 @@ tested_values_dic = {
 
 # We now list the parameters to be tested
 tested_parameters_list = [
-#    'Z_ex',
+    'Z_ex',
 #    'Z_inhib',
 #    'Z_from_inp',
 #    'Z_inter_layer',
@@ -393,7 +395,7 @@ tested_parameters_list = [
 #    'inp_num',
 #    'out_num',
 #    'excitatory_threshold',
-    'inhibitory_threshold',
+#    'inhibitory_threshold',
 #    'eta',
 #    'gamma_ex',
 #    'gamma_in'
@@ -401,14 +403,14 @@ tested_parameters_list = [
 
 varied_parameters_list = [
 #    'Z_ex',
-#    'Z_inhib',
+    'Z_inhib',
 #    'Z_from_inp',
 #    'Z_inter_layer',
 #    'excitatory_precentage',
 #    'excitatory_threshold',
 #    'inhibitory_threshold',
 #    'gamma_ex',
-    'gamma_in'
+#    'gamma_in'
     ]
 
 result_dic = {}
@@ -435,8 +437,8 @@ for tested_parameter in tested_parameters_list:
             print('\tTrying ' + tested_parameter + '=' + str(tested_value))
             configuration[tested_parameter] = tested_value
             biggest_diff_average, cluster_diff_average, variance_average = simulate_with_configuration(configuration, increase_decrease_functions[0],increase_decrease_functions[1])
-            print('\tGot biggest diff ' + str(biggest_diff_average) + ', cluster diff ' + str(cluster_diff_average) + ', variance ' + str(variance_average))
-            result_log_fp.write('\t' + str(tested_value) + ': biggest diff ' + str(biggest_diff_average) + ', cluster diff ' + str(cluster_diff_average) + ', variance ' + str(variance_average) + '\n')
+            print('\t' + varied_parameter + ' value: ' + str(configuration[varied_parameter]) + ', biggest diff ' + str(biggest_diff_average) + ', cluster diff ' + str(cluster_diff_average) + ', variance ' + str(variance_average))
+            result_log_fp.write('\t' + str(tested_value) + 'with ' + varied_parameter + '=' + str(configuration[varied_parameter]) + ': biggest diff ' + str(biggest_diff_average) + ', cluster diff ' + str(cluster_diff_average) + ', variance ' + str(variance_average) + '\n')
             result_log_fp.flush()
             biggest_diff_averages.append(biggest_diff_average)
             cluster_diff_averages.append(cluster_diff_average)
