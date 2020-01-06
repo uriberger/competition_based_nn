@@ -95,7 +95,6 @@ Z_sensory_response = 0.2 * excitatory_threshold
 Z_response_prediction = 0.2 * excitatory_threshold
 
 # Data structures
-synapse_strength = None
 zero_matrices = None
 before_prev_act = None
 prev_act = None
@@ -103,7 +102,7 @@ prev_input = None
 
 class ModelClass:
     
-    def __init__(self, configuration):
+    def __init__(self, configuration, load_from_file):
         self.Z_in = configuration['Z_in']
         self.ex_sync_window = configuration['ex_sync_window']
         self.ex_sync_threshold = configuration['ex_sync_threshold']
@@ -111,24 +110,25 @@ class ModelClass:
         self.Z_ll_ob_to_ll_ac = configuration['Z_ll_ob_to_ll_ac']
         self.quiet = configuration['quiet']
         
+        self.init_data_structures(load_from_file)
+        
     def my_print(self, my_str):
         if not self.quiet:
             print(my_str)
 
     def save_synapse_strength(self):
         # Save the synapse strength matrix to a file.
-        trained_strength = [synapse_strength]
+        trained_strength = [self.synapse_strength]
         file_name = "synapse_strength"
         file_name += "_" + str(unit_num) + "_neurons_" + str(layer_num) + "_layers"
         np.save(file_name, trained_strength)
     
-    def initialize(self, load_from_file = False):
+    def init_data_structures(self, load_from_file):
         ''' Initialize the data structures.
         load_from_file- if different from 'None', holds the suffix of the file to be
-        loaded. ''' 
-        global synapse_strength
+        loaded. '''
         global zero_matrices
-        synapse_strength = []
+        self.synapse_strength = []
         
         if not load_from_file:
             # Initialize random synapse strength
@@ -141,98 +141,98 @@ class ModelClass:
                         neurons in the same layer'''
                         cur_synapse_strength[:, -iin_num:] = (-1) * cur_synapse_strength[:, -iin_num:]
                     post_layer_synapses.append(cur_synapse_strength)
-                synapse_strength.append(post_layer_synapses)
+                self.synapse_strength.append(post_layer_synapses)
             
             # Hard coded good weights
             '''for layer in range(layer_num):
                 ll_act_begin = ll_ob_num+hl_ob_num
-                synapse_strength[layer][layer][ll_act_begin,0] = 0
-                synapse_strength[layer][layer][ll_act_begin,1] = 1
-                synapse_strength[layer][layer][ll_act_begin,2] = 1
-                synapse_strength[layer][layer][ll_act_begin,3] = 0
-                synapse_strength[layer][layer][ll_act_begin,4] = 1
-                synapse_strength[layer][layer][ll_act_begin,5] = 0
-                synapse_strength[layer][layer][ll_act_begin,6] = 0
-                synapse_strength[layer][layer][ll_act_begin,7] = 0
-                synapse_strength[layer][layer][ll_act_begin,8] = 0
-                synapse_strength[layer][layer][ll_act_begin,9] = 0
+                self.synapse_strength[layer][layer][ll_act_begin,0] = 0
+                self.synapse_strength[layer][layer][ll_act_begin,1] = 1
+                self.synapse_strength[layer][layer][ll_act_begin,2] = 1
+                self.synapse_strength[layer][layer][ll_act_begin,3] = 0
+                self.synapse_strength[layer][layer][ll_act_begin,4] = 1
+                self.synapse_strength[layer][layer][ll_act_begin,5] = 0
+                self.synapse_strength[layer][layer][ll_act_begin,6] = 0
+                self.synapse_strength[layer][layer][ll_act_begin,7] = 0
+                self.synapse_strength[layer][layer][ll_act_begin,8] = 0
+                self.synapse_strength[layer][layer][ll_act_begin,9] = 0
                 
-                synapse_strength[layer][layer][ll_act_begin+1,0] = 0
-                synapse_strength[layer][layer][ll_act_begin+1,1] = 0
-                synapse_strength[layer][layer][ll_act_begin+1,2] = 1
-                synapse_strength[layer][layer][ll_act_begin+1,3] = 1
-                synapse_strength[layer][layer][ll_act_begin+1,4] = 1
-                synapse_strength[layer][layer][ll_act_begin+1,5] = 0
-                synapse_strength[layer][layer][ll_act_begin+1,6] = 0
-                synapse_strength[layer][layer][ll_act_begin+1,7] = 0
-                synapse_strength[layer][layer][ll_act_begin+1,8] = 0
-                synapse_strength[layer][layer][ll_act_begin+1,9] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+1,0] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+1,1] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+1,2] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+1,3] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+1,4] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+1,5] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+1,6] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+1,7] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+1,8] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+1,9] = 0
                 
-                synapse_strength[layer][layer][ll_act_begin+2,0] = 0
-                synapse_strength[layer][layer][ll_act_begin+2,1] = 0
-                synapse_strength[layer][layer][ll_act_begin+2,2] = 0
-                synapse_strength[layer][layer][ll_act_begin+2,3] = 1
-                synapse_strength[layer][layer][ll_act_begin+2,4] = 1
-                synapse_strength[layer][layer][ll_act_begin+2,5] = 0
-                synapse_strength[layer][layer][ll_act_begin+2,6] = 0
-                synapse_strength[layer][layer][ll_act_begin+2,7] = 0
-                synapse_strength[layer][layer][ll_act_begin+2,8] = 0
-                synapse_strength[layer][layer][ll_act_begin+2,9] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+2,0] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+2,1] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+2,2] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+2,3] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+2,4] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+2,5] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+2,6] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+2,7] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+2,8] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+2,9] = 0
                 
-                synapse_strength[layer][layer][ll_act_begin+3,0] = 0
-                synapse_strength[layer][layer][ll_act_begin+3,1] = 0
-                synapse_strength[layer][layer][ll_act_begin+3,2] = 0
-                synapse_strength[layer][layer][ll_act_begin+3,3] = 1
-                synapse_strength[layer][layer][ll_act_begin+3,4] = 1
-                synapse_strength[layer][layer][ll_act_begin+3,5] = 0
-                synapse_strength[layer][layer][ll_act_begin+3,6] = 0
-                synapse_strength[layer][layer][ll_act_begin+3,7] = 0
-                synapse_strength[layer][layer][ll_act_begin+3,8] = 0
-                synapse_strength[layer][layer][ll_act_begin+3,9] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+3,0] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+3,1] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+3,2] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+3,3] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+3,4] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+3,5] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+3,6] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+3,7] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+3,8] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+3,9] = 0
                 
-                synapse_strength[layer][layer][ll_act_begin+4,0] = 0
-                synapse_strength[layer][layer][ll_act_begin+4,1] = 0
-                synapse_strength[layer][layer][ll_act_begin+4,2] = 0
-                synapse_strength[layer][layer][ll_act_begin+4,3] = 0
-                synapse_strength[layer][layer][ll_act_begin+4,4] = 0
-                synapse_strength[layer][layer][ll_act_begin+4,5] = 0
-                synapse_strength[layer][layer][ll_act_begin+4,6] = 1
-                synapse_strength[layer][layer][ll_act_begin+4,7] = 1
-                synapse_strength[layer][layer][ll_act_begin+4,8] = 0
-                synapse_strength[layer][layer][ll_act_begin+4,9] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+4,0] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+4,1] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+4,2] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+4,3] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+4,4] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+4,5] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+4,6] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+4,7] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+4,8] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+4,9] = 0
                 
-                synapse_strength[layer][layer][ll_act_begin+5,0] = 0
-                synapse_strength[layer][layer][ll_act_begin+5,1] = 0
-                synapse_strength[layer][layer][ll_act_begin+5,2] = 0
-                synapse_strength[layer][layer][ll_act_begin+5,3] = 0
-                synapse_strength[layer][layer][ll_act_begin+5,4] = 0
-                synapse_strength[layer][layer][ll_act_begin+5,5] = 1
-                synapse_strength[layer][layer][ll_act_begin+5,6] = 1
-                synapse_strength[layer][layer][ll_act_begin+5,7] = 0
-                synapse_strength[layer][layer][ll_act_begin+5,8] = 0
-                synapse_strength[layer][layer][ll_act_begin+5,9] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+5,0] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+5,1] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+5,2] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+5,3] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+5,4] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+5,5] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+5,6] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+5,7] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+5,8] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+5,9] = 0
                 
-                synapse_strength[layer][layer][ll_act_begin+6,0] = 0
-                synapse_strength[layer][layer][ll_act_begin+6,1] = 0
-                synapse_strength[layer][layer][ll_act_begin+6,2] = 0
-                synapse_strength[layer][layer][ll_act_begin+6,3] = 0
-                synapse_strength[layer][layer][ll_act_begin+6,4] = 0
-                synapse_strength[layer][layer][ll_act_begin+6,5] = 1
-                synapse_strength[layer][layer][ll_act_begin+6,6] = 0
-                synapse_strength[layer][layer][ll_act_begin+6,7] = 0
-                synapse_strength[layer][layer][ll_act_begin+6,8] = 0
-                synapse_strength[layer][layer][ll_act_begin+6,9] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+6,0] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+6,1] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+6,2] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+6,3] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+6,4] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+6,5] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+6,6] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+6,7] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+6,8] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+6,9] = 0
                 
-                synapse_strength[layer][layer][ll_act_begin+7,0] = 0
-                synapse_strength[layer][layer][ll_act_begin+7,1] = 0
-                synapse_strength[layer][layer][ll_act_begin+7,2] = 0
-                synapse_strength[layer][layer][ll_act_begin+7,3] = 0
-                synapse_strength[layer][layer][ll_act_begin+7,4] = 0
-                synapse_strength[layer][layer][ll_act_begin+7,5] = 1
-                synapse_strength[layer][layer][ll_act_begin+7,6] = 0
-                synapse_strength[layer][layer][ll_act_begin+7,7] = 0
-                synapse_strength[layer][layer][ll_act_begin+7,8] = 0
-                synapse_strength[layer][layer][ll_act_begin+7,9] = 0'''
+                self.synapse_strength[layer][layer][ll_act_begin+7,0] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+7,1] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+7,2] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+7,3] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+7,4] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+7,5] = 1
+                self.synapse_strength[layer][layer][ll_act_begin+7,6] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+7,7] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+7,8] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+7,9] = 0'''
                 
         else:
             file_name = "synapse_strength"
@@ -241,7 +241,7 @@ class ModelClass:
             
             trained_strength = np.load(file_name)
         
-            synapse_strength = trained_strength[0]
+            self.synapse_strength = trained_strength[0]
             
         global prev_act
         prev_act = []
@@ -289,127 +289,125 @@ class ModelClass:
     
     def fix_synapse_strength(self):
         # Normalize the synapses strength, and enforce the invariants.
-        global synapse_strength
-        
         excitatory_unit_num = unit_num-iin_num
         
         for post_layer in range(layer_num):
             for pre_layer in range(layer_num):
-                synapse_strength[post_layer][pre_layer] = np.multiply(synapse_strength[post_layer][pre_layer], zero_matrices[post_layer][pre_layer])
+                self.synapse_strength[post_layer][pre_layer] = np.multiply(self.synapse_strength[post_layer][pre_layer], zero_matrices[post_layer][pre_layer])
                 if post_layer == pre_layer+1:
                     normalized_weight = Z_forward
                     for unit_ind in range(unit_num-iin_num):
-                        synapse_strength[post_layer][pre_layer][unit_ind,unit_ind] = normalized_weight
+                        self.synapse_strength[post_layer][pre_layer][unit_ind,unit_ind] = normalized_weight
                 if post_layer == pre_layer-1:
                     normalized_weight = Z_backward
                     for unit_ind in range(unit_num-iin_num):
-                        synapse_strength[post_layer][pre_layer][unit_ind,unit_ind] = normalized_weight
+                        self.synapse_strength[post_layer][pre_layer][unit_ind,unit_ind] = normalized_weight
                 if post_layer == pre_layer:
                     # Make sure excitatory weights in inter node are all excitatory
-                    synapse_strength[post_layer][pre_layer][:,:excitatory_unit_num][synapse_strength[post_layer][pre_layer][:,:excitatory_unit_num] < 0] = 0
+                    self.synapse_strength[post_layer][pre_layer][:,:excitatory_unit_num][self.synapse_strength[post_layer][pre_layer][:,:excitatory_unit_num] < 0] = 0
                     
                     # Normalize incoming excitatory weights to each unit
                     '''normalizing_factor = Z_ex
-                    excitatory_row_sums = (synapse_strength[post_layer][pre_layer][:,:excitatory_unit_num].sum(axis=1).reshape(unit_num,1).repeat(excitatory_unit_num, axis=1))/normalizing_factor'''
+                    excitatory_row_sums = (self.synapse_strength[post_layer][pre_layer][:,:excitatory_unit_num].sum(axis=1).reshape(unit_num,1).repeat(excitatory_unit_num, axis=1))/normalizing_factor'''
                     ll_ob_begin = 0
                     hl_ob_begin = ll_ob_begin + ll_ob_num
                     ll_ac_begin = hl_ob_begin + hl_ob_num
                     ml_ac_begin = ll_ac_begin + ll_ac_num
                     tl_ac_begin = ml_ac_begin + ml_ac_num
                     
-                    ll_ob_to_ll_ob_row_sum = (synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_ll_ob
-                    hl_ob_to_ll_ob_row_sum = (synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ll_ob_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_ll_ob
-                    ll_ac_to_ll_ob_row_sum = (synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_ll_ob
-                    ml_ac_to_ll_ob_row_sum = (synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_ll_ob
-                    tl_ac_to_ll_ob_row_sum = (synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_ll_ob
+                    ll_ob_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_ll_ob
+                    hl_ob_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ll_ob_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_ll_ob
+                    ll_ac_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_ll_ob
+                    ml_ac_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_ll_ob
+                    tl_ac_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_ll_ob
                     ll_ob_row_sum = np.concatenate((ll_ob_to_ll_ob_row_sum,hl_ob_to_ll_ob_row_sum,ll_ac_to_ll_ob_row_sum,ml_ac_to_ll_ob_row_sum,tl_ac_to_ll_ob_row_sum),axis=1)
                     
-                    ll_ob_to_hl_ob_row_sum = (synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_hl_ob
-                    hl_ob_to_hl_ob_row_sum = (synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(hl_ob_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_hl_ob
-                    ll_ac_to_hl_ob_row_sum = (synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_hl_ob
-                    ml_ac_to_hl_ob_row_sum = (synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_hl_ob
-                    tl_ac_to_hl_ob_row_sum = (synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_hl_ob
+                    ll_ob_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_hl_ob
+                    hl_ob_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(hl_ob_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_hl_ob
+                    ll_ac_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_hl_ob
+                    ml_ac_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_hl_ob
+                    tl_ac_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_hl_ob
                     hl_ob_row_sum = np.concatenate((ll_ob_to_hl_ob_row_sum,hl_ob_to_hl_ob_row_sum,ll_ac_to_hl_ob_row_sum,ml_ac_to_hl_ob_row_sum,tl_ac_to_hl_ob_row_sum),axis=1)
                     
-                    ll_ob_to_ll_ac_row_sum = (synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ll_ob_num, axis=1))/self.Z_ll_ob_to_ll_ac
-                    hl_ob_to_ll_ac_row_sum = (synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ll_ac_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_ll_ac
-                    ll_ac_to_ll_ac_row_sum = (synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_ll_ac
-                    ml_ac_to_ll_ac_row_sum = (synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_ll_ac
-                    tl_ac_to_ll_ac_row_sum = (synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_ll_ac
+                    ll_ob_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ll_ob_num, axis=1))/self.Z_ll_ob_to_ll_ac
+                    hl_ob_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ll_ac_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_ll_ac
+                    ll_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_ll_ac
+                    ml_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_ll_ac
+                    tl_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_ll_ac
                     ll_ac_row_sum = np.concatenate((ll_ob_to_ll_ac_row_sum,hl_ob_to_ll_ac_row_sum,ll_ac_to_ll_ac_row_sum,ml_ac_to_ll_ac_row_sum,tl_ac_to_ll_ac_row_sum),axis=1)
                     
-                    ll_ob_to_ml_ac_row_sum = (synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_ml_ac
-                    hl_ob_to_ml_ac_row_sum = (synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ml_ac_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_ml_ac
-                    ll_ac_to_ml_ac_row_sum = (synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_ml_ac
-                    ml_ac_to_ml_ac_row_sum = (synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_ml_ac
-                    tl_ac_to_ml_ac_row_sum = (synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_ml_ac
+                    ll_ob_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_ml_ac
+                    hl_ob_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ml_ac_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_ml_ac
+                    ll_ac_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_ml_ac
+                    ml_ac_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_ml_ac
+                    tl_ac_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_ml_ac
                     ml_ac_row_sum = np.concatenate((ll_ob_to_ml_ac_row_sum,hl_ob_to_ml_ac_row_sum,ll_ac_to_ml_ac_row_sum,ml_ac_to_ml_ac_row_sum,tl_ac_to_ml_ac_row_sum),axis=1)
                     
-                    ll_ob_to_tl_ac_row_sum = (synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_tl_ac
-                    hl_ob_to_tl_ac_row_sum = (synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(tl_ac_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_tl_ac
-                    ll_ac_to_tl_ac_row_sum = (synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_tl_ac
-                    ml_ac_to_tl_ac_row_sum = (synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_tl_ac
-                    tl_ac_to_tl_ac_row_sum = (synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_tl_ac
+                    ll_ob_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_tl_ac
+                    hl_ob_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(tl_ac_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_tl_ac
+                    ll_ac_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_tl_ac
+                    ml_ac_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_tl_ac
+                    tl_ac_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_tl_ac
                     tl_ac_row_sum = np.concatenate((ll_ob_to_tl_ac_row_sum,hl_ob_to_tl_ac_row_sum,ll_ac_to_tl_ac_row_sum,ml_ac_to_tl_ac_row_sum,tl_ac_to_tl_ac_row_sum),axis=1)
                     
-                    ll_ob_to_in_row_sum = (synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(iin_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_in
-                    hl_ob_to_in_row_sum = (synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(iin_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_in
-                    ll_ac_to_in_row_sum = (synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(iin_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_in
-                    ml_ac_to_in_row_sum = (synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(iin_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_in
-                    tl_ac_to_in_row_sum = (synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(iin_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_in
+                    ll_ob_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(iin_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_in
+                    hl_ob_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(iin_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_in
+                    ll_ac_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(iin_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_in
+                    ml_ac_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(iin_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_in
+                    tl_ac_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(iin_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_in
                     in_from_ex_row_sum = np.concatenate((ll_ob_to_in_row_sum,hl_ob_to_in_row_sum,ll_ac_to_in_row_sum,ml_ac_to_in_row_sum,tl_ac_to_in_row_sum),axis=1)
                     
                     excitatory_row_sums = np.concatenate((ll_ob_row_sum,hl_ob_row_sum,ll_ac_row_sum,ml_ac_row_sum,tl_ac_row_sum,in_from_ex_row_sum),axis=0)
                     
                     # Make sure inhibitory weights in inter node are all inhibitory
-                    synapse_strength[post_layer][pre_layer][:,excitatory_unit_num:][synapse_strength[post_layer][pre_layer][:,excitatory_unit_num:] > 0] = 0
+                    self.synapse_strength[post_layer][pre_layer][:,excitatory_unit_num:][self.synapse_strength[post_layer][pre_layer][:,excitatory_unit_num:] > 0] = 0
                     # Normalize incoming inhibitory weights to each unit
                     if IIN_PROJECTIONS:
                         ''' Inhibitory neurons innervate excitatory neurons from the same layer,
                         and inhibitory neurons from all layers'''
                         normalizing_factor_for_ex_neurons = self.Z_in
                         normalizing_factor_for_in_neurons = self.Z_in/layer_num
-                        in_to_ex_row_sums = (-1)*((synapse_strength[post_layer][pre_layer][:excitatory_unit_num,excitatory_unit_num:].sum(axis=1).reshape(excitatory_unit_num,1).repeat(iin_num, axis=1))/normalizing_factor_for_ex_neurons)
-                        in_to_in_row_sums = (-1)*((synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:].sum(axis=1).reshape(iin_num,1).repeat(iin_num, axis=1))/normalizing_factor_for_in_neurons)
+                        in_to_ex_row_sums = (-1)*((self.synapse_strength[post_layer][pre_layer][:excitatory_unit_num,excitatory_unit_num:].sum(axis=1).reshape(excitatory_unit_num,1).repeat(iin_num, axis=1))/normalizing_factor_for_ex_neurons)
+                        in_to_in_row_sums = (-1)*((self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:].sum(axis=1).reshape(iin_num,1).repeat(iin_num, axis=1))/normalizing_factor_for_in_neurons)
                         inhibitory_row_sums = np.concatenate((in_to_ex_row_sums, in_to_in_row_sums))
                     else:
                         normalizing_factor = self.Z_in
-                        inhibitory_row_sums = (-1)*((synapse_strength[post_layer][pre_layer][:,excitatory_unit_num:].sum(axis=1).reshape(unit_num,1).repeat(iin_num, axis=1))/normalizing_factor)
+                        inhibitory_row_sums = (-1)*((self.synapse_strength[post_layer][pre_layer][:,excitatory_unit_num:].sum(axis=1).reshape(unit_num,1).repeat(iin_num, axis=1))/normalizing_factor)
                     
                     row_sums = np.concatenate((excitatory_row_sums,inhibitory_row_sums),axis=1)
                     row_sums[row_sums == 0] = 1
-                    synapse_strength[post_layer][pre_layer] = synapse_strength[post_layer][pre_layer]/row_sums
+                    self.synapse_strength[post_layer][pre_layer] = self.synapse_strength[post_layer][pre_layer]/row_sums
                 elif IIN_PROJECTIONS:
                     # Inhibitory neurons are connected through different layers
                     # Make sure weights are all inhibitory
-                    synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:][synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:] > 0] = 0
+                    self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:][self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:] > 0] = 0
                     # Normalize incoming inhibitory weights to each unit
                     normalizing_factor = self.Z_in / layer_num
-                    inhibitory_row_sums = (-1)*((synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:].sum(axis=1).reshape(iin_num,1).repeat(iin_num, axis=1))/normalizing_factor)
+                    inhibitory_row_sums = (-1)*((self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:].sum(axis=1).reshape(iin_num,1).repeat(iin_num, axis=1))/normalizing_factor)
                     row_sums = np.pad(inhibitory_row_sums,((excitatory_unit_num,0),(excitatory_unit_num,0)), 'constant')
                     row_sums[row_sums == 0] = 1
-                    synapse_strength[post_layer][pre_layer] = synapse_strength[post_layer][pre_layer]/row_sums
+                    self.synapse_strength[post_layer][pre_layer] = self.synapse_strength[post_layer][pre_layer]/row_sums
                 if post_layer == layer_num-1 and pre_layer == 0:
                     normalized_weight = Z_sensory_response
                     # Sensory neurons directly innervate response neurons
                     for unit_ind in range(unit_num):
-                        synapse_strength[post_layer][pre_layer][unit_ind,unit_ind] = normalized_weight
+                        self.synapse_strength[post_layer][pre_layer][unit_ind,unit_ind] = normalized_weight
                 if post_layer == layer_num-2 and pre_layer == layer_num-1:
                     # High-level action response neurons innervate high-level object prediction neurons
                     hl_ob_begin = ll_ob_num
                     hl_ac_begin = ll_ob_num+hl_ob_num+ll_ac_num
-                    synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ac_begin:hl_ac_begin+hl_ac_num][synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ac_begin:hl_ac_begin+hl_ac_num] < 0] = 0
+                    self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ac_begin:hl_ac_begin+hl_ac_num][self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ac_begin:hl_ac_begin+hl_ac_num] < 0] = 0
                     
                     # Normalize incoming weights to each unit
                     normalizing_factor = Z_response_prediction
-                    row_sums = (synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ac_begin:hl_ac_begin+hl_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(hl_ac_num, axis=1))/normalizing_factor
+                    row_sums = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ac_begin:hl_ac_begin+hl_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(hl_ac_num, axis=1))/normalizing_factor
                     row_sums = np.pad(row_sums, ((hl_ob_begin,unit_num-hl_ob_begin-hl_ob_num),(hl_ac_begin,unit_num-hl_ac_begin-hl_ac_num)), 'constant')
                     row_sums[row_sums == 0] = 1
-                    synapse_strength[post_layer][pre_layer] = synapse_strength[post_layer][pre_layer]/row_sums
+                    self.synapse_strength[post_layer][pre_layer] = self.synapse_strength[post_layer][pre_layer]/row_sums
                     
                 # Top level actions doesn't get innervated by the cortex
                 '''top_level_action_begin = ll_ob_num+hl_ob_num+ll_ac_num+ml_ac_num
-                synapse_strength[post_layer][pre_layer][top_level_action_begin:top_level_action_begin+tl_ac_num,:] = 0'''
+                self.synapse_strength[post_layer][pre_layer][top_level_action_begin:top_level_action_begin+tl_ac_num,:] = 0'''
         
     def calculate_winners(self, input_vec, begin_ind, node_num,stop_when_reach_def_comp_len,stop_when_resolved):
         fire_history = []
@@ -508,8 +506,6 @@ class ModelClass:
     
     def update_synapse_strength_long_term(self, winning_action_list, prev_input, before_prev_input, comp_len):
         
-        global synapse_strength
-        
         zeta = comp_len / comp_len_zeta_ratio
         delta_input_strength = np.sum(prev_input-before_prev_input)
         max_possible_input_strength = sensory_input_strength * ll_ob_num
@@ -525,14 +521,12 @@ class ModelClass:
             for node_ind in range(len(winning_action_list)):
                 winner_loser_factor = (winning_action_list[node_ind]-0.5)*2
                 real_node_ind = node_ind+ll_action_begin
-                synapse_strength[layer_ind][layer_ind][[real_node_ind],:] += winner_loser_factor*strength_change_vec.transpose()
+                self.synapse_strength[layer_ind][layer_ind][[real_node_ind],:] += winner_loser_factor*strength_change_vec.transpose()
                 
         self.fix_synapse_strength()
                 
     def update_synapse_strength_short_term(self):
         # Update the synapses strength according the a Hebbian learning rule
-        global synapse_strength
-        
         for post_layer in range(layer_num):
             for pre_layer in range(layer_num):
                 post_layer_prev_act = prev_act[post_layer]
@@ -547,7 +541,7 @@ class ModelClass:
                 # Strengthen inhibitory neurons weights by making them more negative (and not more positive)
                 update_mat[:,-iin_num:] = (-1) * update_mat[:,-iin_num:]
                     
-                synapse_strength[post_layer][pre_layer] = synapse_strength[post_layer][pre_layer] + eta * update_mat
+                self.synapse_strength[post_layer][pre_layer] = self.synapse_strength[post_layer][pre_layer] + eta * update_mat
         
         self.fix_synapse_strength()
         
@@ -566,7 +560,7 @@ class ModelClass:
                 input_from_prev_layer = np.pad(sensory_input_vec, ((0,unit_num-ll_ob_num),(0,0)), 'constant')
                 cur_input = np.add(cur_input, input_from_prev_layer)
             for pre_layer in range(layer_num):
-                input_from_pre_layer = np.matmul(synapse_strength[post_layer][pre_layer], prev_act[pre_layer])
+                input_from_pre_layer = np.matmul(self.synapse_strength[post_layer][pre_layer], prev_act[pre_layer])
                 if only_inhibitory:
                     input_from_pre_layer[:-iin_num,0] = 0
                 cur_input = np.add(cur_input, input_from_pre_layer)
@@ -953,8 +947,7 @@ def calibrate_competition_parameters(configuration):
         goals = [(24,25)]
         action_begin_loc = ll_ob_num+hl_ob_num
         
-        model = ModelClass(configuration)
-        model.initialize(False)
+        model = ModelClass(configuration,False)
         
         input_vec = generate_state_from_simulator(world, initial_player, goals)
         winner_list, _, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,True)
@@ -1060,8 +1053,7 @@ def calibrate_brain_parameters(configuration):
         initial_player = (starting_loc[0],starting_loc[1],0)
         goals = [(24,25)]
         
-        model = ModelClass(configuration)
-        model.initialize(False)
+        model = ModelClass(configuration,False)
         action_begin_loc = ll_ob_num+hl_ob_num
         
         input_vec = generate_state_from_simulator(world, initial_player, goals)
@@ -1153,8 +1145,7 @@ def evaluate_Z_in_separation_correlation():
             goals = [(24,25)]
             action_begin_loc = ll_ob_num+hl_ob_num
             
-            model = ModelClass(configuration)
-            model.initialize(False)
+            model = ModelClass(configuration,False)
             
             input_vec = generate_state_from_simulator(world, initial_player, goals)
             _, competition_len, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,False)
@@ -1197,8 +1188,7 @@ def main(load_from_file, configuration):
     initial_player = (starting_loc[0],starting_loc[1],0)
     goals = [(24,25)]
     
-    model = ModelClass(configuration)
-    model.initialize(load_from_file)
+    model = ModelClass(configuration,load_from_file)
     
     cur_player = initial_player
     if not quiet:
