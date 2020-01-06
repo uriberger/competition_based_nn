@@ -232,6 +232,9 @@ def simulate_with_configuration(configuration):
         # Simulate dynamics
         fire_count = model.simulate_dynamics(input_vec)
         
+        # Simulate dynamics
+        fire_count = model.simulate_dynamics(input_vec)
+        
         # Run statistics on fire count
         biggest_diff, cluster_diff, variance = run_statistics(fire_count)
         biggest_diffs.append(biggest_diff)
