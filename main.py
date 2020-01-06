@@ -95,7 +95,6 @@ Z_sensory_response = 0.2 * excitatory_threshold
 Z_response_prediction = 0.2 * excitatory_threshold
 
 # Data structures
-zero_matrices = None
 before_prev_act = None
 prev_act = None
 prev_input = None
@@ -127,7 +126,6 @@ class ModelClass:
         ''' Initialize the data structures.
         load_from_file- if different from 'None', holds the suffix of the file to be
         loaded. '''
-        global zero_matrices
         self.synapse_strength = []
         
         if not load_from_file:
@@ -258,9 +256,9 @@ class ModelClass:
         for _ in range(layer_num):
             prev_input.append(np.zeros((unit_num, 1)))
         
-        zero_matrices = []
+        self.zero_matrices = []
         for post_layer in range(layer_num):
-            zero_matrices.append([])
+            self.zero_matrices.append([])
             for pre_layer in range(layer_num):
                 zero_matrix = np.zeros((unit_num,unit_num))
                 if pre_layer == post_layer:
@@ -283,7 +281,7 @@ class ModelClass:
                     excitatory_unit_num = unit_num - iin_num
                     zero_matrix[excitatory_unit_num:,excitatory_unit_num:] = 1
                             
-                zero_matrices[post_layer].append(zero_matrix)
+                self.zero_matrices[post_layer].append(zero_matrix)
         
         self.fix_synapse_strength()
     
@@ -293,7 +291,7 @@ class ModelClass:
         
         for post_layer in range(layer_num):
             for pre_layer in range(layer_num):
-                self.synapse_strength[post_layer][pre_layer] = np.multiply(self.synapse_strength[post_layer][pre_layer], zero_matrices[post_layer][pre_layer])
+                self.synapse_strength[post_layer][pre_layer] = np.multiply(self.synapse_strength[post_layer][pre_layer], self.zero_matrices[post_layer][pre_layer])
                 if post_layer == pre_layer+1:
                     normalized_weight = Z_forward
                     for unit_ind in range(unit_num-iin_num):
