@@ -8,17 +8,26 @@ import math
 import matplotlib.pyplot as plt
 import enum
 
-########################## #
+############################
 # Configuration parameters #
 ############################
 
 # Connection of inhibitory neurons to inhibitory neurons from other layers
 IIN_PROJECTIONS = False
 
-# Fast connection between inhibitory neurons
-IIN_FAST_CONNECTIONS_FACTOR = 3
+# Fast connection between inhibitory neurons- NEED TO TEST
+IIN_FAST_CONNECTIONS_FACTOR = 1
 
-# Connection of inhibitory neurons only to specific excitatory neurons
+# Direct connection between the sensory and response layers
+SENSORY_RESPONSE_CONNECTION = True
+
+# High-level action response neurons innervate high-level object prediction neurons
+HL_AC_RESPONSE_HL_OB_PREDICTION_CONNECTION = False
+
+# Top level actions innervation by the cortex
+TL_AC_INNERVATION = True
+
+# Connection of inhibitory neurons only to specific excitatory neurons- NOT IMPLEMENTED YET
 SPATIAL_IINS = False
 
 ###################
@@ -47,6 +56,8 @@ layer_num = 5
 winner_window_len = 10
 response_layer = layer_num-1
 #response_layer = 1
+
+active_tl_ac_node = 28
 
 default_competition_len = 20000
 
@@ -258,10 +269,10 @@ class ModelClass:
                     # No self loops
                     np.fill_diagonal(zero_matrix, 0)
                 if pre_layer == post_layer-1 or pre_layer == post_layer+1 or \
-                (pre_layer == 0 and post_layer == layer_num-1): # Response neurons are directly innervated by sensory neurons
+                (SENSORY_RESPONSE_CONNECTION and pre_layer == 0 and post_layer == layer_num-1): # Response neurons are directly innervated by sensory neurons
                     for unit_ind in range(unit_num-iin_num):
                         zero_matrix[unit_ind,unit_ind] = 1
-                if pre_layer == layer_num-1 and post_layer == layer_num-2:
+                if HL_AC_RESPONSE_HL_OB_PREDICTION_CONNECTION and pre_layer == layer_num-1 and post_layer == layer_num-2:
                     # High-level action response neurons innervate high-level object prediction neurons
                     hl_ob_begin = ll_ob_num
                     hl_ac_begin = ll_ob_num+hl_ob_num+ll_ac_num
@@ -377,12 +388,12 @@ class ModelClass:
                     row_sums = np.pad(inhibitory_row_sums,((excitatory_unit_num,0),(excitatory_unit_num,0)), 'constant')
                     row_sums[row_sums == 0] = 1
                     self.synapse_strength[post_layer][pre_layer] = self.synapse_strength[post_layer][pre_layer]/row_sums
-                if post_layer == layer_num-1 and pre_layer == 0:
+                if SENSORY_RESPONSE_CONNECTION and post_layer == layer_num-1 and pre_layer == 0:
                     normalized_weight = Z_sensory_response
                     # Sensory neurons directly innervate response neurons
                     for unit_ind in range(unit_num):
                         self.synapse_strength[post_layer][pre_layer][unit_ind,unit_ind] = normalized_weight
-                if post_layer == layer_num-2 and pre_layer == layer_num-1:
+                if HL_AC_RESPONSE_HL_OB_PREDICTION_CONNECTION and post_layer == layer_num-2 and pre_layer == layer_num-1:
                     # High-level action response neurons innervate high-level object prediction neurons
                     hl_ob_begin = ll_ob_num
                     hl_ac_begin = ll_ob_num+hl_ob_num+ll_ac_num
@@ -396,8 +407,9 @@ class ModelClass:
                     self.synapse_strength[post_layer][pre_layer] = self.synapse_strength[post_layer][pre_layer]/row_sums
                     
                 # Top level actions doesn't get innervated by the cortex
-                '''top_level_action_begin = ll_ob_num+hl_ob_num+ll_ac_num+ml_ac_num
-                self.synapse_strength[post_layer][pre_layer][top_level_action_begin:top_level_action_begin+tl_ac_num,:] = 0'''
+                if not TL_AC_INNERVATION:
+                    top_level_action_begin = ll_ob_num+hl_ob_num+ll_ac_num+ml_ac_num
+                    self.synapse_strength[post_layer][pre_layer][top_level_action_begin:top_level_action_begin+tl_ac_num,:] = 0
         
     def calculate_winners(self, input_vec, begin_ind, node_num,stop_when_reach_def_comp_len,stop_when_resolved):
         fire_history = []
@@ -551,10 +563,10 @@ class ModelClass:
                     input_from_pre_layer[:-iin_num,0] = 0
                 cur_input = np.add(cur_input, input_from_pre_layer)
             
-            '''if post_layer == layer_num-1:
-                # The response neuron of the top level action is always innervated
+            if (not TL_AC_INNERVATION) and (post_layer == layer_num-1):
+                # The response neuron of the top level action is not innervated, so we should innervate it from outside
                 top_level_action_begin = ll_ob_num+hl_ob_num+ll_ac_num+ml_ac_num
-                cur_input[top_level_action_begin+active_tl_ac_node,0] = sensory_input_strength'''
+                cur_input[top_level_action_begin+active_tl_ac_node,0] = sensory_input_strength
                 
             ''' Accumulating input and refractory period: If a neuron fired in the last time step,
             we subtract its previous input from its current input. Otherwise- we add its previous
