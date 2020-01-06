@@ -94,11 +94,6 @@ Z_backward = 0.1 * excitatory_threshold
 Z_sensory_response = 0.2 * excitatory_threshold
 Z_response_prediction = 0.2 * excitatory_threshold
 
-# Data structures
-before_prev_act = None
-prev_act = None
-prev_input = None
-
 class ModelClass:
     
     def __init__(self, configuration, load_from_file):
@@ -241,20 +236,17 @@ class ModelClass:
         
             self.synapse_strength = trained_strength[0]
             
-        global prev_act
-        prev_act = []
+        self.prev_act = []
         for _ in range(layer_num):
-            prev_act.append(np.zeros((unit_num, 1)))
+            self.prev_act.append(np.zeros((unit_num, 1)))
         
-        global before_prev_act
-        before_prev_act = []
+        self.before_prev_act = []
         for _ in range(layer_num):
-            before_prev_act.append(np.zeros((unit_num, 1)))
+            self.before_prev_act.append(np.zeros((unit_num, 1)))
         
-        global prev_input
-        prev_input = []
+        self.prev_input_to_neurons = []
         for _ in range(layer_num):
-            prev_input.append(np.zeros((unit_num, 1)))
+            self.prev_input_to_neurons.append(np.zeros((unit_num, 1)))
         
         self.zero_matrices = []
         for post_layer in range(layer_num):
@@ -440,7 +432,7 @@ class ModelClass:
             # Document fire history
             for l in range(layer_num):
                 for unit_ind in range(unit_num):
-                    if prev_act[l][unit_ind, 0] == 1:
+                    if self.prev_act[l][unit_ind, 0] == 1:
                         fire_history[l][unit_ind].append(t)
             if need_to_wait_for_comp_resolution:            
                 if len(synched_iins) == 0:       
@@ -502,15 +494,15 @@ class ModelClass:
         action = (right_count - left_count) % ll_ac_num
         return action
     
-    def update_synapse_strength_long_term(self, winning_action_list, prev_input, before_prev_input, comp_len):
+    def update_synapse_strength_long_term(self, winning_action_list, prev_sensory_input, before_prev_sensory_input, comp_len):
         
         zeta = comp_len / comp_len_zeta_ratio
-        delta_input_strength = np.sum(prev_input-before_prev_input)
+        delta_input_strength = np.sum(prev_sensory_input-before_prev_sensory_input)
         max_possible_input_strength = sensory_input_strength * ll_ob_num
         normalized_delta_input_strength = delta_input_strength / max_possible_input_strength
         total_strength_change = normalized_delta_input_strength * zeta
-        before_prev_input_strength = np.sum(before_prev_input)
-        strength_change_vec = before_prev_input * (total_strength_change / before_prev_input_strength)
+        before_prev_input_strength = np.sum(before_prev_sensory_input)
+        strength_change_vec = before_prev_sensory_input * (total_strength_change / before_prev_input_strength)
         strength_change_vec = np.pad(strength_change_vec, ((0,unit_num-ll_ob_num),(0,0)), 'constant')
         
         ll_action_begin = ll_ob_num + hl_ob_num
@@ -527,13 +519,13 @@ class ModelClass:
         # Update the synapses strength according the a Hebbian learning rule
         for post_layer in range(layer_num):
             for pre_layer in range(layer_num):
-                post_layer_prev_act = prev_act[post_layer]
+                post_layer_prev_act = self.prev_act[post_layer]
                 normalizing_excitatory_vec = np.ones((unit_num-iin_num,1)) * gamma_ex
                 normalizing_inhibitory_vec = np.ones((iin_num,1)) * gamma_in
                 normalizing_vec = np.concatenate((normalizing_excitatory_vec, normalizing_inhibitory_vec))
                 normalized_post_layer_prev_act = post_layer_prev_act - normalizing_vec
                 
-                pre_layer_before_prev_act = before_prev_act[pre_layer]
+                pre_layer_before_prev_act = self.before_prev_act[pre_layer]
                 
                 update_mat = np.matmul(normalized_post_layer_prev_act, pre_layer_before_prev_act.transpose())
                 # Strengthen inhibitory neurons weights by making them more negative (and not more positive)
@@ -545,10 +537,6 @@ class ModelClass:
         
     def prop_external_input(self, sensory_input_vec, only_inhibitory=False):
         # Simulate the dynamics of the system for a single time step
-        global before_prev_act
-        global prev_act
-        global prev_input
-        
         new_act = []
         new_input = []
         
@@ -558,7 +546,7 @@ class ModelClass:
                 input_from_prev_layer = np.pad(sensory_input_vec, ((0,unit_num-ll_ob_num),(0,0)), 'constant')
                 cur_input = np.add(cur_input, input_from_prev_layer)
             for pre_layer in range(layer_num):
-                input_from_pre_layer = np.matmul(self.synapse_strength[post_layer][pre_layer], prev_act[pre_layer])
+                input_from_pre_layer = np.matmul(self.synapse_strength[post_layer][pre_layer], self.prev_act[pre_layer])
                 if only_inhibitory:
                     input_from_pre_layer[:-iin_num,0] = 0
                 cur_input = np.add(cur_input, input_from_pre_layer)
@@ -571,14 +559,14 @@ class ModelClass:
             ''' Accumulating input and refractory period: If a neuron fired in the last time step,
             we subtract its previous input from its current input. Otherwise- we add its previous
             input to its current input. '''
-            prev_input_factor = (1 - 2 * prev_act[post_layer])
-            cur_input = np.add(cur_input, prev_input_factor * prev_input[post_layer])
+            prev_input_factor = (1 - 2 * self.prev_act[post_layer])
+            cur_input = np.add(cur_input, prev_input_factor * self.prev_input_to_neurons[post_layer])
             
             # Make sure the input is non-negative
             cur_input = np.where(cur_input>=0, cur_input, 0)
             if only_inhibitory:
                 # Excitatory neurons doesn't change in an only-inhibitory stage
-                cur_input[:-iin_num] = prev_input[post_layer][:-iin_num]
+                cur_input[:-iin_num] = self.prev_input_to_neurons[post_layer][:-iin_num]
             
             cur_act = np.concatenate((self.excitatory_activation_function(cur_input[:cur_input.shape[0]-iin_num,[0]]),
                                   self.inhibitory_activation_function(cur_input[cur_input.shape[0]-iin_num:,[0]])),
@@ -586,9 +574,9 @@ class ModelClass:
             new_act.append(cur_act)
             new_input.append(cur_input)
         
-        before_prev_act = prev_act
-        prev_act = new_act
-        prev_input = new_input
+        self.before_prev_act = self.prev_act
+        self.prev_act = new_act
+        self.prev_input_to_neurons = new_input
         
         self.update_synapse_strength_short_term()
         
@@ -1197,20 +1185,20 @@ def main(load_from_file, configuration):
     
     action_begin_loc = ll_ob_num+hl_ob_num
     
-    prev_input_vec = None
-    input_vec = None
+    prev_sensory_input_vec = None
+    sensory_input_vec = None
     winner_list = None
     comp_len = 0
     
     for i in range(max_rounds):
-        prev_input_vec = input_vec
-        input_vec = generate_state_from_simulator(world, cur_player, goals)
+        prev_sensory_input_vec = sensory_input_vec
+        sensory_input_vec = generate_state_from_simulator(world, cur_player, goals)
         if not quiet:
-            print('input vec: ' + str((input_vec.transpose() > 0).astype(int)))
+            print('sensory input vec: ' + str((sensory_input_vec.transpose() > 0).astype(int)))
         if i > 0:
-            model.update_synapse_strength_long_term(winner_list, input_vec, prev_input_vec, comp_len)
+            model.update_synapse_strength_long_term(winner_list, sensory_input_vec, prev_sensory_input_vec, comp_len)
         
-        winner_list, comp_len, _ = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,False,True)
+        winner_list, comp_len, _ = model.calculate_winners(sensory_input_vec, action_begin_loc, ll_ac_num,False,True)
         next_move = model.convert_winner_list_to_action(winner_list)
         if not quiet:
             print('winner list: ' + str(winner_list))
@@ -1230,11 +1218,11 @@ def main(load_from_file, configuration):
                 print(cur_player)
          
         if new_player_loc in goals:
-            prev_input_vec = input_vec
-            input_vec = generate_state_from_simulator(world, cur_player, goals)
+            prev_sensory_input_vec = sensory_input_vec
+            sensory_input_vec = generate_state_from_simulator(world, cur_player, goals)
             if not quiet:
-                print('input vec: ' + str((input_vec.transpose() > 0).astype(int)))
-            model.update_synapse_strength_long_term(winner_list, input_vec, prev_input_vec, comp_len)
+                print('sensory input vec: ' + str((sensory_input_vec.transpose() > 0).astype(int)))
+            model.update_synapse_strength_long_term(winner_list, sensory_input_vec, prev_sensory_input_vec, comp_len)
             break
     
     model.save_synapse_strength()
