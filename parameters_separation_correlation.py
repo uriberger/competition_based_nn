@@ -7,7 +7,7 @@ normal_firing_rate = 0.005
 
 class ModelClass:
     
-    def __init__(self, configuration):
+    def __init__(self, configuration,init_from_file):
         # Members determined by the configuration
         self.Z_ex = configuration['Z_ex']
         self.Z_inhib = configuration['Z_inhib']
@@ -35,23 +35,28 @@ class ModelClass:
         self.before_prev_act = []
         self.prev_act = []
         self.prev_input = []
-        self.init_data_structures()
+        self.init_data_structures(init_from_file)
         
     def my_print(self, my_str):
         if not self.quiet:
             print(my_str)
-        
-    def init_data_structures(self):
-        # Initialize random synapse strength
-        for post_layer in range(layer_num):
-            post_layer_synapses = []
-            for pre_layer in range(layer_num):
-                cur_synapse_strength = np.random.rand(self.unit_num, self.unit_num)
-                if pre_layer == post_layer:
-                    # Inhibitory neurons only effect neurons in the same layer
-                    cur_synapse_strength[:, -self.iin_num:] = (-1) * cur_synapse_strength[:, -self.iin_num:]
-                post_layer_synapses.append(cur_synapse_strength)
-            self.synapse_strength.append(post_layer_synapses)
+    
+    def init_data_structures(self,init_from_file):
+        if init_from_file:
+            file_name = "synapse_strength.npy"
+            trained_strength = np.load(file_name)
+            self.synapse_strength = trained_strength[0]
+        else:
+            # Initialize random synapse strength
+            for post_layer in range(layer_num):
+                post_layer_synapses = []
+                for pre_layer in range(layer_num):
+                    cur_synapse_strength = np.random.rand(self.unit_num, self.unit_num)
+                    if pre_layer == post_layer:
+                        # Inhibitory neurons only effect neurons in the same layer
+                        cur_synapse_strength[:, -self.iin_num:] = (-1) * cur_synapse_strength[:, -self.iin_num:]
+                    post_layer_synapses.append(cur_synapse_strength)
+                self.synapse_strength.append(post_layer_synapses)
             
         for _ in range(layer_num):
             self.prev_act.append(np.zeros((self.unit_num, 1)))
@@ -209,40 +214,23 @@ class ModelClass:
         
         self.fix_synapse_strength()
                     
-def simulate_with_configuration(configuration, increase_firing_rate, decrease_firing_rate):
+def simulate_with_configuration(configuration):
     biggest_diffs = []
     cluster_diffs = []
     variances = []
     
-    iter_count = 0
-    got_normal_average = False
-    while not got_normal_average:
-        model = ModelClass(configuration)
+    for iter_count in range(sample_num):
+        model = ModelClass(configuration,True)
         
         if iter_count % 100 == 0:
-            model.my_print('\t\tCalibration iter count: ' + str(iter_count))
-        
+            model.my_print('\t\tData collection iter count: ' + str(iter_count))
+            
         # Generate random input
         input_vec = model.generate_random_input_vec()
         #model.my_print('\t\tinput vec: ' + str(input_vec.transpose()))
         
         # Simulate dynamics
         fire_count = model.simulate_dynamics(input_vec)
-        average_fire_count = np.mean(fire_count)
-        if average_fire_count < (normal_firing_rate-0.0025)*comp_len:
-            model.my_print('\t\tFire count too low, increasing')
-            increase_firing_rate(configuration)
-        elif average_fire_count > (normal_firing_rate+0.0025)*comp_len:
-            model.my_print('\t\tFire count too high, decreasing')
-            decrease_firing_rate(configuration)
-        else:
-            got_normal_average = True
-            
-        iter_count += 1
-            
-    for iter_count in range(sample_num):
-        if iter_count % 100 == 0:
-            model.my_print('\t\tData collection iter count: ' + str(iter_count))
         
         # Run statistics on fire count
         biggest_diff, cluster_diff, variance = run_statistics(fire_count)
@@ -281,95 +269,33 @@ configuration = {}
 configuration['excitatory_precentage'] = 0.8
 configuration['inp_num'] = 8
 configuration['out_num'] = 8
-configuration['excitatory_threshold'] = 0.4
+#configuration['excitatory_threshold'] = 0.4
+configuration['excitatory_threshold'] = 0.394
 configuration['inhibitory_threshold'] = 0.2
 configuration['eta'] = 0.0001
 configuration['gamma_ex'] = 0.05
 configuration['gamma_in'] = 0.14
-configuration['Z_ex'] = 2*configuration['excitatory_threshold']
-configuration['Z_inhib'] = (1-configuration['excitatory_precentage']) * configuration['excitatory_threshold'] * 10
+#configuration['Z_ex'] = 0.3
+configuration['Z_ex'] = 0.25
+configuration['Z_inhib'] = 0.4
 configuration['Z_from_inp'] = 0.5
 configuration['Z_inter_layer'] = configuration['Z_ex']
 configuration['quiet'] = False
 
-''' We go over all the combinations of a tested parameter and varied parameter and try
-estimating the correlation with the different separation measures.
-We start by defining, for every parameter, a function that changes this parameter, in the purpose
-of increasing/decreasing the firing rate. '''
-
-def Z_ex_increase_firing_rate(configuration):
-    configuration['Z_ex'] = configuration['Z_ex'] * 1.1
-    
-def Z_ex_decrease_firing_rate(configuration):
-    configuration['Z_ex'] = configuration['Z_ex'] * 0.9
-    
-def Z_inhib_increase_firing_rate(configuration):
-    configuration['Z_inhib'] = configuration['Z_inhib'] * 0.9
-    
-def Z_inhib_decrease_firing_rate(configuration):
-    configuration['Z_inhib'] = configuration['Z_inhib'] * 1.1
-    
-def Z_from_inp_increase_firing_rate(configuration):
-    configuration['Z_from_inp'] = configuration['Z_from_inp'] * 1.1
-    
-def Z_from_inp_decrease_firing_rate(configuration):
-    configuration['Z_from_inp'] = configuration['Z_from_inp'] * 0.9
-    
-def excitatory_precentage_increase_firing_rate(configuration):
-    configuration['excitatory_precentage'] = np.min(1,configuration['excitatory_precentage'] * 1.1)
-    
-def excitatory_precentage_decrease_firing_rate(configuration):
-    configuration['excitatory_precentage'] = configuration['excitatory_precentage'] * 0.9
-    
-def excitatory_threshold_increase_firing_rate(configuration):
-    configuration['excitatory_threshold'] = configuration['excitatory_threshold'] * 0.9
-    
-def excitatory_threshold_decrease_firing_rate(configuration):
-    configuration['excitatory_threshold'] = configuration['excitatory_threshold'] * 1.1
-    
-def inhibitory_threshold_increase_firing_rate(configuration):
-    configuration['inhibitory_threshold'] = configuration['inhibitory_threshold'] * 1.1
-    
-def inhibitory_threshold_decrease_firing_rate(configuration):
-    configuration['inhibitory_threshold'] = configuration['inhibitory_threshold'] * 0.9
-    
-def gamma_ex_increase_firing_rate(configuration):
-    configuration['gamma_ex'] = configuration['gamma_ex'] * 0.9
-    
-def gamma_ex_decrease_firing_rate(configuration):
-    configuration['gamma_ex'] = configuration['gamma_ex'] * 1.1
-    
-def gamma_in_increase_firing_rate(configuration):
-    configuration['gamma_in'] = configuration['gamma_in'] * 1.1
-    
-def gamma_in_decrease_firing_rate(configuration):
-    configuration['gamma_in'] = configuration['gamma_in'] * 0.9
-
-# We now put all these functions into a dictionary
-increase_decrease_functions_dic = {
-    'Z_ex' : (Z_ex_increase_firing_rate, Z_ex_decrease_firing_rate),
-    'Z_inhib' : (Z_inhib_increase_firing_rate, Z_inhib_decrease_firing_rate),
-    'Z_from_inp' : (Z_from_inp_increase_firing_rate, Z_from_inp_decrease_firing_rate),
-    'excitatory_precentage' : (excitatory_precentage_increase_firing_rate, excitatory_precentage_decrease_firing_rate),
-    'excitatory_threshold' : (excitatory_threshold_increase_firing_rate, excitatory_threshold_decrease_firing_rate),
-    'inhibitory_threshold' : (inhibitory_threshold_increase_firing_rate, inhibitory_threshold_decrease_firing_rate),
-    'gamma_ex' : (gamma_ex_increase_firing_rate, gamma_ex_decrease_firing_rate),
-    'gamma_in' : (gamma_in_increase_firing_rate, gamma_in_decrease_firing_rate),
-    }
-
 # We now list all the of the values to be tested for every parameter
 tested_values_dic = {
-    'Z_ex' : [configuration['excitatory_threshold']*x for x in [y/5+0.1 for y in range(20)]],
-    'Z_inhib' : [(1-configuration['excitatory_precentage']) * configuration['excitatory_threshold'] * x for x in range(5,25)],
-    'Z_from_inp' : [x*0.03+0.2 for x in range(20)],
-    'excitatory_precentage' : [x*0.015+0.615 for x in range(20)],
-    'inp_num' : [x for x in range(5,12)],
-    'out_num' : [x for x in range(5,12)],
-    'excitatory_threshold' : [x*0.03+0.1 for x in range(20)],
-    'inhibitory_threshold' : [x*0.03+0.1 for x in range(20)],
-    'eta' : [x*0.00005 + 0.00005 for x in range(20)],
-    'gamma_ex' : [x*0.025 + 0.025 for x in range(13)],
-    'gamma_in' : [x*0.025 + 0.025 for x in range(13)],
+#    'Z_ex,Z_inhib' : ([0.1+x*0.025 for x in range(13)],[0.16+x*0.042 for x in range(13)]),
+    'Z_ex,excitatory_threshold' : ([0.1+x*0.025 for x in range(13)],[0.19+x*0.034 for x in range(13)])
+#    'Z_inhib' : [(1-configuration['excitatory_precentage']) * configuration['excitatory_threshold'] * x for x in range(5,25)],
+#    'Z_from_inp' : [x*0.03+0.2 for x in range(20)],
+#    'excitatory_precentage' : [x*0.015+0.615 for x in range(20)],
+#    'inp_num' : [x for x in range(5,12)],
+#    'out_num' : [x for x in range(5,12)],
+#    'excitatory_threshold' : [x*0.03+0.1 for x in range(20)],
+#    'inhibitory_threshold' : [x*0.03+0.1 for x in range(20)],
+#    'eta' : [x*0.00005 + 0.00005 for x in range(20)],
+#    'gamma_ex' : [x*0.025 + 0.025 for x in range(13)],
+#    'gamma_in' : [x*0.025 + 0.025 for x in range(13)],
     }
 '''tested_values_dic = {
     'Z_ex' : [configuration['excitatory_threshold']*x for x in [y/5+0.6 for y in range(2)]],
@@ -385,69 +311,59 @@ tested_values_dic = {
     'gamma_in' : [x*0.025 + 0.115 for x in range(2)],
     }'''
 
-# We now list the parameters to be tested
-tested_parameters_list = [
-    'Z_ex',
-#    'Z_inhib',
-#    'Z_from_inp',
-#    'Z_inter_layer',
-#    'excitatory_precentage',
-#    'inp_num',
-#    'out_num',
-#    'excitatory_threshold',
-#    'inhibitory_threshold',
-#    'eta',
-#    'gamma_ex',
-#    'gamma_in'
-    ]
-
-varied_parameters_list = [
-#    'Z_ex',
-    'Z_inhib',
-#    'Z_from_inp',
-#    'Z_inter_layer',
-#    'excitatory_precentage',
-#    'excitatory_threshold',
-#    'inhibitory_threshold',
-#    'gamma_ex',
-#    'gamma_in'
-    ]
-
-result_dic = {}
-
-# Finally, the actualy testing
-for tested_parameter in tested_parameters_list:
-    for varied_parameter in varied_parameters_list:
-        result_log_fp = open('result_' + tested_parameter + '_' + varied_parameter + '.txt','w')
-        if tested_parameter == varied_parameter:
-            continue
-        print('Testing ' + tested_parameter + ', varying ' + varied_parameter)
-        result_log_fp.write('Testing ' + tested_parameter + ', varying ' + varied_parameter + '\n')
+generate_new_synapse_strength = False
+if generate_new_synapse_strength:
+    #model = ModelClass(configuration,False)
+    model = ModelClass(configuration,True)
+    input_vec1 = model.generate_random_input_vec()
+    fire_count1 = model.simulate_dynamics(input_vec1)
+    model.__init__(configuration, True)
+    input_vec2 = model.generate_random_input_vec()
+    fire_count2 = model.simulate_dynamics(input_vec2)
+    model.__init__(configuration, True)
+    input_vec3 = model.generate_random_input_vec()
+    fire_count3 = model.simulate_dynamics(input_vec3)
+    
+    '''trained_strength = [model.synapse_strength]
+    file_name = "synapse_strength"
+    np.save(file_name, trained_strength)'''
+else:
+    result_dic = {}
+    
+    # Finally, the actualy testing
+    for tested_parameter_pair, tested_values in tested_values_dic.items():
+        result_log_fp = open('result_' + tested_parameter_pair + '.txt','w')
+        print('Testing ' + tested_parameter_pair)
+        result_log_fp.write('Testing ' + tested_parameter_pair + '\n')
         result_log_fp.flush()
-        increase_decrease_functions = increase_decrease_functions_dic[varied_parameter]
-        tested_values = tested_values_dic[tested_parameter]
         
-        tested_parameter_orig_value = configuration[tested_parameter]
-        varied_parameter_orig_value = configuration[varied_parameter]
+        tested_parameter1 = tested_parameter_pair.split(',')[0]
+        tested_parameter2 = tested_parameter_pair.split(',')[1]
+        
+        tested_parameter1_orig_value = configuration[tested_parameter1]
+        tested_parameter2_orig_value = configuration[tested_parameter2]
         
         biggest_diff_averages = []
         cluster_diff_averages = []
         variance_averages = []
-        for tested_value in tested_values:
-            print('\tTrying ' + tested_parameter + '=' + str(tested_value))
-            configuration[tested_parameter] = tested_value
-            biggest_diff_average, cluster_diff_average, variance_average = simulate_with_configuration(configuration, increase_decrease_functions[0],increase_decrease_functions[1])
-            print('\t' + varied_parameter + ' value: ' + str(configuration[varied_parameter]) + ', biggest diff ' + str(biggest_diff_average) + ', cluster diff ' + str(cluster_diff_average) + ', variance ' + str(variance_average))
-            result_log_fp.write('\t' + str(tested_value) + 'with ' + varied_parameter + '=' + str(configuration[varied_parameter]) + ': biggest diff ' + str(biggest_diff_average) + ', cluster diff ' + str(cluster_diff_average) + ', variance ' + str(variance_average) + '\n')
+        for i in range(len(tested_values[0])):
+            tested_value1 = tested_values[0][i]
+            tested_value2 = tested_values[1][i]
+            print('\tTrying ' + tested_parameter1 + '=' + str(tested_value1) + ',' + tested_parameter2 + '=' + str(tested_value2))
+            configuration[tested_parameter1] = tested_value1
+            configuration[tested_parameter2] = tested_value2
+            biggest_diff_average, cluster_diff_average, variance_average = simulate_with_configuration(configuration)
+            print('\tbiggest diff ' + str(biggest_diff_average) + ', cluster diff ' + str(cluster_diff_average) + ', variance ' + str(variance_average))
+            result_log_fp.write('\tbiggest diff ' + str(biggest_diff_average) + ', cluster diff ' + str(cluster_diff_average) + ', variance ' + str(variance_average) + '\n')
             result_log_fp.flush()
             biggest_diff_averages.append(biggest_diff_average)
             cluster_diff_averages.append(cluster_diff_average)
             variance_averages.append(variance_average)
         
-        configuration[tested_parameter] = tested_parameter_orig_value
-        configuration[varied_parameter] = varied_parameter_orig_value
+        configuration[tested_parameter1] = tested_parameter1_orig_value
+        configuration[tested_parameter2] = tested_parameter2_orig_value
         
-        result_dic[tested_parameter+'_'+varied_parameter] = (biggest_diff_averages, cluster_diff_averages, variance_averages)
-        np.save('result_'+tested_parameter+'_'+varied_parameter,[biggest_diff_averages, cluster_diff_averages, variance_averages])
-        
-np.save('result_dic',[result_dic])
+        result_dic[tested_parameter_pair] = (biggest_diff_averages, cluster_diff_averages, variance_averages)
+        np.save('result_'+tested_parameter_pair,[biggest_diff_averages, cluster_diff_averages, variance_averages])
+            
+    np.save('result_dic',[result_dic])
