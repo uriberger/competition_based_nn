@@ -53,13 +53,16 @@ comp_len_zeta_ratio = 1500
 gamma_ex = 0.05
 gamma_in = 0.14
 layer_num = 5
-winner_window_len = 10
 response_layer = layer_num-1
 #response_layer = 1
 
 active_tl_ac_node = 28
 
+# Competition parameters
 default_competition_len = 20000
+iin_sync_window = 20
+iin_sync_threshold = 15
+after_iin_sync_waiting = 2000
 
 # Normalization constants
 Z_ex = excitatory_threshold * 2
@@ -412,13 +415,13 @@ class ModelClass:
                     self.synapse_strength[post_layer][pre_layer][top_level_action_begin:top_level_action_begin+tl_ac_num,:] = 0
         
     def calculate_winners(self, input_vec, begin_ind, node_num,stop_when_reach_def_comp_len,stop_when_resolved):
+        # Given an input, simulate the dynamics of the system, for iter_num time steps
         fire_history = []
         
         # Stopping criterion
         need_to_wait_for_def_comp_len = stop_when_reach_def_comp_len
         need_to_wait_for_comp_resolution = stop_when_resolved
         
-        # Given an input, simulate the dynamics of the system, for iter_num time steps
         for _ in range(layer_num):
             cur_history = []
             for _ in range(unit_num):
@@ -446,14 +449,16 @@ class ModelClass:
                 for unit_ind in range(unit_num):
                     if self.prev_act[l][unit_ind, 0] == 1:
                         fire_history[l][unit_ind].append(t)
-            if need_to_wait_for_comp_resolution:            
-                if len(synched_iins) == 0:       
+            if need_to_wait_for_comp_resolution:
+                ''' The first step of the competition is- synchronization of the IINs.
+                We need to wait until they are synchronized before we check if the competition
+                is resolved. '''          
+                if len(synched_iins) == 0:
+                    ''' IINs were not synched until now. Go over all pairs of IINs and check if
+                    they are now synched. '''       
                     for first_iin in range(unit_num-iin_num, unit_num):
                         for second_iin in range(first_iin+1, unit_num):
                             # Check if iins where synched in the last sync window
-                            iin_sync_window = 20
-                            iin_sync_threshold = 15
-                            
                             if len(fire_history[response_layer][first_iin]) < iin_sync_window or len(fire_history[response_layer][second_iin]) < iin_sync_window:
                                 # Not enough firing- still can't determine synchronization
                                 continue
@@ -466,7 +471,10 @@ class ModelClass:
                             sync_time_step = t
                             self.my_print('sync time step: ' + str(t))
                             break
-                elif t > sync_time_step+2000:
+                elif t > sync_time_step+after_iin_sync_waiting:
+                    ''' After the initial sync, we wait some more time ("after_iin_sync_waiting")
+                    to make sure the synchronization is complete.
+                    After the waiting, we check if the competition is resolved. '''
                     competition_resolved = True
                     
                     iin_firing = set().union(*([[x for x in fire_history[response_layer][iin_ind] if x > t-self.ex_sync_window*10] for iin_ind in range(unit_num-iin_num,unit_num)]))
@@ -576,6 +584,7 @@ class ModelClass:
             
             # Make sure the input is non-negative
             cur_input = np.where(cur_input>=0, cur_input, 0)
+            
             if only_inhibitory:
                 # Excitatory neurons doesn't change in an only-inhibitory stage
                 cur_input[:-iin_num] = self.prev_input_to_neurons[post_layer][:-iin_num]
