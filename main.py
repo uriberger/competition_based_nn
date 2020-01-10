@@ -34,14 +34,14 @@ SPATIAL_IINS = False
 # Model functions #
 ###################
 
-# Parameters
-excitatory_precentage = 0.8
+# General parameters
 ll_ob_num = 10
 ll_ac_num = 8
 hl_ob_num = 7
 ml_ac_num = 3
 tl_ac_num = 4
 hl_ac_num = ml_ac_num+tl_ac_num
+excitatory_precentage = 0.8
 iin_num = math.ceil((ll_ob_num+ll_ac_num+hl_ob_num+hl_ac_num) * \
                         (1-excitatory_precentage)/excitatory_precentage)
 unit_num = 40
@@ -110,14 +110,21 @@ Z_response_prediction = 0.2 * excitatory_threshold
 
 class ModelClass:
     
-    def __init__(self, configuration, load_from_file):
-        self.Z_in = configuration['Z_in']
-        self.ex_sync_window = configuration['ex_sync_window']
-        self.ex_sync_threshold = configuration['ex_sync_threshold']
-        self.ex_unsync_threshold = configuration['ex_unsync_threshold']
-        self.Z_ll_ob_to_ll_ac = configuration['Z_ll_ob_to_ll_ac']
-        self.quiet = configuration['quiet']
+    default_configuration = {
+        # Competition parameters
+        'ex_sync_window' : 95,
+        'ex_sync_threshold' : 6,
+        'ex_unsync_threshold' : 1,
         
+        # Normalization parameter
+        'Z_in' : 0.8,
+        'Z_ll_ob_to_ll_ac' : 0.48,
+        }
+    
+    def __init__(self, configuration, load_from_file, quiet):
+
+        self.conf = {key : configuration[key] if key in configuration else ModelClass.default_configuration[key] for key in ModelClass.default_configuration.keys()}
+        self.quiet = quiet
         self.init_data_structures(load_from_file)
         
     def my_print(self, my_str):
@@ -333,7 +340,7 @@ class ModelClass:
                     tl_ac_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_hl_ob
                     hl_ob_row_sum = np.concatenate((ll_ob_to_hl_ob_row_sum,hl_ob_to_hl_ob_row_sum,ll_ac_to_hl_ob_row_sum,ml_ac_to_hl_ob_row_sum,tl_ac_to_hl_ob_row_sum),axis=1)
                     
-                    ll_ob_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ll_ob_num, axis=1))/self.Z_ll_ob_to_ll_ac
+                    ll_ob_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ll_ob_num, axis=1))/self.conf['Z_ll_ob_to_ll_ac']
                     hl_ob_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ll_ac_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_ll_ac
                     ll_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_ll_ac
                     ml_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_ll_ac
@@ -369,13 +376,13 @@ class ModelClass:
                     if IIN_PROJECTIONS:
                         ''' Inhibitory neurons innervate excitatory neurons from the same layer,
                         and inhibitory neurons from all layers'''
-                        normalizing_factor_for_ex_neurons = self.Z_in
-                        normalizing_factor_for_in_neurons = self.Z_in/layer_num
+                        normalizing_factor_for_ex_neurons = self.conf['Z_in']
+                        normalizing_factor_for_in_neurons = self.conf['Z_in']/layer_num
                         in_to_ex_row_sums = (-1)*((self.synapse_strength[post_layer][pre_layer][:excitatory_unit_num,excitatory_unit_num:].sum(axis=1).reshape(excitatory_unit_num,1).repeat(iin_num, axis=1))/normalizing_factor_for_ex_neurons)
                         in_to_in_row_sums = (-1)*((self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:].sum(axis=1).reshape(iin_num,1).repeat(iin_num, axis=1))/normalizing_factor_for_in_neurons)
                         inhibitory_row_sums = np.concatenate((in_to_ex_row_sums, in_to_in_row_sums))
                     else:
-                        normalizing_factor = self.Z_in
+                        normalizing_factor = self.conf['Z_in']
                         inhibitory_row_sums = (-1)*((self.synapse_strength[post_layer][pre_layer][:,excitatory_unit_num:].sum(axis=1).reshape(unit_num,1).repeat(iin_num, axis=1))/normalizing_factor)
                     
                     row_sums = np.concatenate((excitatory_row_sums,inhibitory_row_sums),axis=1)
@@ -386,7 +393,7 @@ class ModelClass:
                     # Make sure weights are all inhibitory
                     self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:][self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:] > 0] = 0
                     # Normalize incoming inhibitory weights to each unit
-                    normalizing_factor = self.Z_in / layer_num
+                    normalizing_factor = self.conf['Z_in'] / layer_num
                     inhibitory_row_sums = (-1)*((self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:,excitatory_unit_num:].sum(axis=1).reshape(iin_num,1).repeat(iin_num, axis=1))/normalizing_factor)
                     row_sums = np.pad(inhibitory_row_sums,((excitatory_unit_num,0),(excitatory_unit_num,0)), 'constant')
                     row_sums[row_sums == 0] = 1
@@ -477,15 +484,15 @@ class ModelClass:
                     After the waiting, we check if the competition is resolved. '''
                     competition_resolved = True
                     
-                    iin_firing = set().union(*([[x for x in fire_history[response_layer][iin_ind] if x > t-self.ex_sync_window*10] for iin_ind in range(unit_num-iin_num,unit_num)]))
+                    iin_firing = set().union(*([[x for x in fire_history[response_layer][iin_ind] if x > t-self.conf['ex_sync_window']*10] for iin_ind in range(unit_num-iin_num,unit_num)]))
                     for unit_ind in range(begin_ind, begin_ind+node_num):
                         winner_loser_ind = unit_ind - begin_ind
                         if winner_loser_list[winner_loser_ind] != -1:
                             continue # resolved
-                        ex_intersection_of_last_window = [x for x in fire_history[response_layer][unit_ind][-self.ex_sync_window:] if x in iin_firing]
-                        if len(ex_intersection_of_last_window) >= self.ex_sync_threshold:
+                        ex_intersection_of_last_window = [x for x in fire_history[response_layer][unit_ind][-self.conf['ex_sync_window']:] if x in iin_firing]
+                        if len(ex_intersection_of_last_window) >= self.conf['ex_sync_threshold']:
                             winner_loser_list[winner_loser_ind] = 1 # winner
-                        elif len(ex_intersection_of_last_window) <= self.ex_unsync_threshold:
+                        elif len(ex_intersection_of_last_window) <= self.conf['ex_unsync_threshold']:
                             winner_loser_list[winner_loser_ind] = 0 # loser
                         else:
                             competition_resolved = False # unresolved yet
@@ -954,7 +961,7 @@ def calibrate_competition_parameters(configuration):
         goals = [(24,25)]
         action_begin_loc = ll_ob_num+hl_ob_num
         
-        model = ModelClass(configuration,False)
+        model = ModelClass(configuration,False,True)
         
         input_vec = generate_state_from_simulator(world, initial_player, goals)
         winner_list, _, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,True)
@@ -1060,7 +1067,7 @@ def calibrate_brain_parameters(configuration):
         initial_player = (starting_loc[0],starting_loc[1],0)
         goals = [(24,25)]
         
-        model = ModelClass(configuration,False)
+        model = ModelClass(configuration,False,True)
         action_begin_loc = ll_ob_num+hl_ob_num
         
         input_vec = generate_state_from_simulator(world, initial_player, goals)
@@ -1125,63 +1132,6 @@ def calibrate_parameters(configuration):
     calibrate_brain_parameters(configuration)
     calibrate_competition_parameters(configuration)
 
-def evaluate_Z_in_separation_correlation():
-    print('Starting Z_in-separation correlation evaluation tool...')
-    
-    configuration = {}
-    configuration['quiet'] = True
-    configuration['ex_sync_window'] = 95
-    configuration['ex_sync_threshold'] = 6
-    configuration['ex_unsync_threshold'] = 1
-    sample_num = 100
-    
-    diff_size_averages = []
-    Z_in_factors = [x/2 for x in range(12,28)]
-    for Z_in_factor in Z_in_factors:
-        configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * Z_in_factor
-        print('Trying Z_in == ' + str(configuration['Z_in']) + '...')
-        configuration['Z_ll_ob_to_ll_ac'] = ((Z_in_factor-5)*0.06) * Z_ex
-        normal_count = 0
-        diff_size_sum = 0
-        while normal_count < sample_num:
-            starting_loc = (0,0)
-            while starting_loc == (0,0):
-                starting_loc = (int(np.random.rand() * world_height), int(np.random.rand() * world_length))
-            world = init_world(world_height, world_length, [((0,0),1)])
-            initial_player = (starting_loc[0],starting_loc[1],0)
-            goals = [(24,25)]
-            action_begin_loc = ll_ob_num+hl_ob_num
-            
-            model = ModelClass(configuration,False)
-            
-            input_vec = generate_state_from_simulator(world, initial_player, goals)
-            _, competition_len, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,False)
-            
-            fire_count = [len(x) for x in fire_history[response_layer][action_begin_loc:action_begin_loc+ll_ac_num]]
-            average_fire_count = np.mean(fire_count)
-            if average_fire_count < (high_firing_rate_threshold-0.005)*competition_len:
-                configuration['Z_ll_ob_to_ll_ac'] = 1.1*configuration['Z_ll_ob_to_ll_ac']
-            elif average_fire_count > (high_firing_rate_threshold+0.005)*competition_len:
-                configuration['Z_ll_ob_to_ll_ac'] = 0.9*configuration['Z_ll_ob_to_ll_ac']
-            else:
-                normal_count += 1
-                if normal_count % 10 == 0:
-                    print('Collected ' + str(normal_count) + ' out of ' + str(sample_num))
-                biggest_diff_size = 0
-                fire_count.sort()
-                for i in range(len(fire_count)-1):
-                    if fire_count[i+1]-fire_count[i] > biggest_diff_size:
-                        biggest_diff_size = fire_count[i+1]-fire_count[i]
-                diff_size_sum += biggest_diff_size
-                
-        diff_size_average = diff_size_sum / sample_num
-        print('Diff size average: ' + str(diff_size_average))
-        diff_size_averages.append(diff_size_average)
-        
-    print('Finished!')
-    plt.plot(Z_in_factors, diff_size_averages)
-    plt.show()
-
 #############
 # Main code #
 #############
@@ -1195,7 +1145,7 @@ def main(load_from_file, configuration):
     initial_player = (starting_loc[0],starting_loc[1],0)
     goals = [(24,25)]
     
-    model = ModelClass(configuration,load_from_file)
+    model = ModelClass(configuration,load_from_file,quiet)
     
     cur_player = initial_player
     if not quiet:
@@ -1270,10 +1220,4 @@ plt.plot(range(epoch_num), scores)
 plt.savefig('res')'''
 
 configuration = {}
-configuration['quiet'] = False
-configuration['ex_sync_window'] = 95
-configuration['ex_sync_threshold'] = 6
-configuration['ex_unsync_threshold'] = 1
-configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 20
-configuration['Z_ll_ob_to_ll_ac'] = 0.6 * Z_ex
 main(False,configuration)
