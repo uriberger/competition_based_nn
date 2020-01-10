@@ -45,13 +45,6 @@ excitatory_precentage = 0.8
 iin_num = math.ceil((ll_ob_num+ll_ac_num+hl_ob_num+hl_ac_num) * \
                         (1-excitatory_precentage)/excitatory_precentage)
 unit_num = 40
-excitatory_threshold = 0.4
-inhibitory_threshold = 0.2
-sensory_input_strength = excitatory_threshold / 3
-eta = 0.0001
-comp_len_zeta_ratio = 1500
-gamma_ex = 0.05
-gamma_in = 0.14
 layer_num = 5
 response_layer = layer_num-1
 #response_layer = 1
@@ -60,71 +53,79 @@ active_tl_ac_node = 28
 
 # Competition parameters
 default_competition_len = 20000
-iin_sync_window = 20
-iin_sync_threshold = 15
-after_iin_sync_waiting = 2000
-
-# Normalization constants
-Z_ex = excitatory_threshold * 2
-
-Z_ll_ob_to_ll_ob = 0.1 * Z_ex
-Z_hl_ob_to_ll_ob = 0.6 * Z_ex 
-Z_ll_ac_to_ll_ob = 0.1 * Z_ex
-Z_ml_ac_to_ll_ob = 0.1 * Z_ex
-Z_tl_ac_to_ll_ob = 0.1 * Z_ex
-
-Z_ll_ob_to_hl_ob = 0.6 * Z_ex
-Z_hl_ob_to_hl_ob = 0.1 * Z_ex
-Z_ll_ac_to_hl_ob = 0.1 * Z_ex
-Z_ml_ac_to_hl_ob = 0.1 * Z_ex
-Z_tl_ac_to_hl_ob = 0.1 * Z_ex
-
-Z_hl_ob_to_ll_ac = 0.1 * Z_ex
-Z_ll_ac_to_ll_ac = 0.1 * Z_ex
-Z_ml_ac_to_ll_ac = 0.4 * Z_ex
-Z_tl_ac_to_ll_ac = 0.1 * Z_ex
-
-Z_ll_ob_to_ml_ac = 0.1 * Z_ex
-Z_hl_ob_to_ml_ac = 0.1 * Z_ex
-Z_ll_ac_to_ml_ac = 0.1 * Z_ex
-Z_ml_ac_to_ml_ac = 0.1 * Z_ex
-Z_tl_ac_to_ml_ac = 0.6 * Z_ex
-
-Z_ll_ob_to_tl_ac = 0.1 * Z_ex
-Z_hl_ob_to_tl_ac = 0.6 * Z_ex
-Z_ll_ac_to_tl_ac = 0.1 * Z_ex
-Z_ml_ac_to_tl_ac = 0.1 * Z_ex
-Z_tl_ac_to_tl_ac = 0.1 * Z_ex
-
-Z_ll_ob_to_in = 0.2 * Z_ex
-Z_hl_ob_to_in = 0.2 * Z_ex 
-Z_ll_ac_to_in = 0.2 * Z_ex
-Z_ml_ac_to_in = 0.2 * Z_ex
-Z_tl_ac_to_in = 0.2 * Z_ex
-
-#Z_in = (iin_num/unit_num) * excitatory_threshold * 11
-Z_forward = 0.3 * excitatory_threshold
-Z_backward = 0.1 * excitatory_threshold
-Z_sensory_response = 0.2 * excitatory_threshold
-Z_response_prediction = 0.2 * excitatory_threshold
 
 class ModelClass:
     
     default_configuration = {
+        # Neuron parameters
+        'excitatory_threshold' : 0.4,
+        'inhibitory_threshold' : 0.2,
+        'sensory_input_strength' : 0.13333,
+        
         # Competition parameters
         'ex_sync_window' : 95,
         'ex_sync_threshold' : 6,
         'ex_unsync_threshold' : 1,
+        'iin_sync_window' : 20,
+        'iin_sync_threshold' : 15,
+        'after_iin_sync_waiting' : 2000,
         
         # Normalization parameter
-        'Z_in' : 0.8,
-        'Z_ll_ob_to_ll_ac' : 0.48,
+        'Z_ex_ex_th_ratio' : 2,
+        'Z_in_ex_th_ratio' : 2,
+        
+        'Z_ll_ob_to_ll_ob_Z_ex_ratio' : 0.1,
+        'Z_hl_ob_to_ll_ob_Z_ex_ratio' : 0.6,
+        'Z_ll_ac_to_ll_ob_Z_ex_ratio' : 0.1,
+        'Z_ml_ac_to_ll_ob_Z_ex_ratio' : 0.1,
+        'Z_tl_ac_to_ll_ob_Z_ex_ratio' : 0.1,
+        
+        'Z_ll_ob_to_hl_ob_Z_ex_ratio' : 0.6,
+        'Z_hl_ob_to_hl_ob_Z_ex_ratio' : 0.1,
+        'Z_ll_ac_to_hl_ob_Z_ex_ratio' : 0.1,
+        'Z_ml_ac_to_hl_ob_Z_ex_ratio' : 0.1,
+        'Z_tl_ac_to_hl_ob_Z_ex_ratio' : 0.1,
+        
+        'Z_ll_ob_to_ll_ac_Z_ex_ratio' : 0.51,
+        'Z_hl_ob_to_ll_ac_Z_ex_ratio' : 0.1,
+        'Z_ll_ac_to_ll_ac_Z_ex_ratio' : 0.1,
+        'Z_ml_ac_to_ll_ac_Z_ex_ratio' : 0.4,
+        'Z_tl_ac_to_ll_ac_Z_ex_ratio' : 0.1,
+        
+        'Z_ll_ob_to_ml_ac_Z_ex_ratio' : 0.1,
+        'Z_hl_ob_to_ml_ac_Z_ex_ratio' : 0.1,
+        'Z_ll_ac_to_ml_ac_Z_ex_ratio' : 0.1,
+        'Z_ml_ac_to_ml_ac_Z_ex_ratio' : 0.1,
+        'Z_tl_ac_to_ml_ac_Z_ex_ratio' : 0.6,
+        
+        'Z_ll_ob_to_tl_ac_Z_ex_ratio' : 0.1,
+        'Z_hl_ob_to_tl_ac_Z_ex_ratio' : 0.6,
+        'Z_ll_ac_to_tl_ac_Z_ex_ratio' : 0.1,
+        'Z_ml_ac_to_tl_ac_Z_ex_ratio' : 0.1,
+        'Z_tl_ac_to_tl_ac_Z_ex_ratio' : 0.1,
+    
+        'Z_ll_ob_to_in_Z_ex_ratio' : 0.2,
+        'Z_hl_ob_to_in_Z_ex_ratio' : 0.2,
+        'Z_ll_ac_to_in_Z_ex_ratio' : 0.2,
+        'Z_ml_ac_to_in_Z_ex_ratio' : 0.2,
+        'Z_tl_ac_to_in_Z_ex_ratio' : 0.2,
+        
+        'Z_forward_ex_th_ratio' : 0.3,
+        'Z_backward_ex_th_ratio' : 0.1,
+        'Z_sensory_response_ex_th_ratio' : 0.2,
+        'Z_response_prediction_ex_th_ratio' : 0.2,
+    
+        # Learning parameters
+        'eta' : 0.0001,
+        'comp_len_zeta_ratio' : 1500,
+        'gamma_ex' : 0.05,
+        'gamma_in' : 0.14,
         }
     
     def __init__(self, configuration, load_from_file, quiet):
-
-        self.conf = {key : configuration[key] if key in configuration else ModelClass.default_configuration[key] for key in ModelClass.default_configuration.keys()}
+        self.conf = {key : configuration[key] if key in configuration else ModelClass.default_configuration[key] for key in ModelClass.default_configuration.keys()}        
         self.quiet = quiet
+        self.init_normalization_parameters()
         self.init_data_structures(load_from_file)
         
     def my_print(self, my_str):
@@ -298,6 +299,52 @@ class ModelClass:
         
         self.fix_synapse_strength()
     
+    def init_normalization_parameters(self):
+        # Initialize normalization parameters
+        self.conf['Z_ex'] = self.conf['Z_ex_ex_th_ratio'] * self.conf['excitatory_threshold']
+        self.conf['Z_in'] = (1-excitatory_precentage)*self.conf['excitatory_threshold']*self.conf['Z_in_ex_th_ratio']
+        
+        self.conf['Z_ll_ob_to_ll_ob'] = self.conf['Z_ll_ob_to_ll_ob_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_hl_ob_to_ll_ob'] = self.conf['Z_hl_ob_to_ll_ob_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ll_ac_to_ll_ob'] = self.conf['Z_ll_ac_to_ll_ob_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ml_ac_to_ll_ob'] = self.conf['Z_ml_ac_to_ll_ob_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_tl_ac_to_ll_ob'] = self.conf['Z_tl_ac_to_ll_ob_Z_ex_ratio'] * self.conf['Z_ex']
+        
+        self.conf['Z_ll_ob_to_hl_ob'] = self.conf['Z_ll_ob_to_hl_ob_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_hl_ob_to_hl_ob'] = self.conf['Z_hl_ob_to_hl_ob_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ll_ac_to_hl_ob'] = self.conf['Z_ll_ac_to_hl_ob_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ml_ac_to_hl_ob'] = self.conf['Z_ml_ac_to_hl_ob_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_tl_ac_to_hl_ob'] = self.conf['Z_tl_ac_to_hl_ob_Z_ex_ratio'] * self.conf['Z_ex']
+    
+        self.conf['Z_ll_ob_to_ll_ac'] = self.conf['Z_ll_ob_to_ll_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_hl_ob_to_ll_ac'] = self.conf['Z_hl_ob_to_ll_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ll_ac_to_ll_ac'] = self.conf['Z_ll_ac_to_ll_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ml_ac_to_ll_ac'] = self.conf['Z_ml_ac_to_ll_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_tl_ac_to_ll_ac'] = self.conf['Z_tl_ac_to_ll_ac_Z_ex_ratio'] * self.conf['Z_ex']
+    
+        self.conf['Z_ll_ob_to_ml_ac'] = self.conf['Z_ll_ob_to_ml_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_hl_ob_to_ml_ac'] = self.conf['Z_hl_ob_to_ml_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ll_ac_to_ml_ac'] = self.conf['Z_ll_ac_to_ml_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ml_ac_to_ml_ac'] = self.conf['Z_ml_ac_to_ml_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_tl_ac_to_ml_ac'] = self.conf['Z_tl_ac_to_ml_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        
+        self.conf['Z_ll_ob_to_tl_ac'] = self.conf['Z_ll_ob_to_tl_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_hl_ob_to_tl_ac'] = self.conf['Z_hl_ob_to_tl_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ll_ac_to_tl_ac'] = self.conf['Z_ll_ac_to_tl_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ml_ac_to_tl_ac'] = self.conf['Z_ml_ac_to_tl_ac_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_tl_ac_to_tl_ac'] = self.conf['Z_tl_ac_to_tl_ac_Z_ex_ratio'] * self.conf['Z_ex']
+    
+        self.conf['Z_ll_ob_to_in'] = self.conf['Z_ll_ob_to_in_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_hl_ob_to_in'] = self.conf['Z_hl_ob_to_in_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ll_ac_to_in'] = self.conf['Z_ll_ac_to_in_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_ml_ac_to_in'] = self.conf['Z_ml_ac_to_in_Z_ex_ratio'] * self.conf['Z_ex']
+        self.conf['Z_tl_ac_to_in'] = self.conf['Z_tl_ac_to_in_Z_ex_ratio'] * self.conf['Z_ex']
+        
+        self.conf['Z_forward'] = self.conf['Z_forward_ex_th_ratio'] * self.conf['excitatory_threshold']
+        self.conf['Z_backward'] = self.conf['Z_backward_ex_th_ratio'] * self.conf['excitatory_threshold']
+        self.conf['Z_sensory_response'] = self.conf['Z_sensory_response_ex_th_ratio'] * self.conf['excitatory_threshold']
+        self.conf['Z_response_prediction'] = self.conf['Z_response_prediction_ex_th_ratio'] * self.conf['excitatory_threshold']
+    
     def fix_synapse_strength(self):
         # Normalize the synapses strength, and enforce the invariants.
         excitatory_unit_num = unit_num-iin_num
@@ -306,11 +353,11 @@ class ModelClass:
             for pre_layer in range(layer_num):
                 self.synapse_strength[post_layer][pre_layer] = np.multiply(self.synapse_strength[post_layer][pre_layer], self.zero_matrices[post_layer][pre_layer])
                 if post_layer == pre_layer+1:
-                    normalized_weight = Z_forward
+                    normalized_weight = self.conf['Z_forward']
                     for unit_ind in range(unit_num-iin_num):
                         self.synapse_strength[post_layer][pre_layer][unit_ind,unit_ind] = normalized_weight
                 if post_layer == pre_layer-1:
-                    normalized_weight = Z_backward
+                    normalized_weight = self.conf['Z_backward']
                     for unit_ind in range(unit_num-iin_num):
                         self.synapse_strength[post_layer][pre_layer][unit_ind,unit_ind] = normalized_weight
                 if post_layer == pre_layer:
@@ -326,46 +373,46 @@ class ModelClass:
                     ml_ac_begin = ll_ac_begin + ll_ac_num
                     tl_ac_begin = ml_ac_begin + ml_ac_num
                     
-                    ll_ob_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_ll_ob
-                    hl_ob_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ll_ob_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_ll_ob
-                    ll_ac_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_ll_ob
-                    ml_ac_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_ll_ob
-                    tl_ac_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_ll_ob
+                    ll_ob_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ll_ob_num, axis=1))/self.conf['Z_ll_ob_to_ll_ob']
+                    hl_ob_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ll_ob_num,1).repeat(hl_ob_num, axis=1))/self.conf['Z_hl_ob_to_ll_ob']
+                    ll_ac_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ll_ac_num, axis=1))/self.conf['Z_ll_ac_to_ll_ob']
+                    ml_ac_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(ml_ac_num, axis=1))/self.conf['Z_ml_ac_to_ll_ob']
+                    tl_ac_to_ll_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ob_begin:ll_ob_begin+ll_ob_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ll_ob_num,1).repeat(tl_ac_num, axis=1))/self.conf['Z_tl_ac_to_ll_ob']
                     ll_ob_row_sum = np.concatenate((ll_ob_to_ll_ob_row_sum,hl_ob_to_ll_ob_row_sum,ll_ac_to_ll_ob_row_sum,ml_ac_to_ll_ob_row_sum,tl_ac_to_ll_ob_row_sum),axis=1)
                     
-                    ll_ob_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_hl_ob
-                    hl_ob_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(hl_ob_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_hl_ob
-                    ll_ac_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_hl_ob
-                    ml_ac_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_hl_ob
-                    tl_ac_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_hl_ob
+                    ll_ob_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ll_ob_num, axis=1))/self.conf['Z_ll_ob_to_hl_ob']
+                    hl_ob_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(hl_ob_num,1).repeat(hl_ob_num, axis=1))/self.conf['Z_hl_ob_to_hl_ob']
+                    ll_ac_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ll_ac_num, axis=1))/self.conf['Z_ll_ac_to_hl_ob']
+                    ml_ac_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(ml_ac_num, axis=1))/self.conf['Z_ml_ac_to_hl_ob']
+                    tl_ac_to_hl_ob_row_sum = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(tl_ac_num, axis=1))/self.conf['Z_tl_ac_to_hl_ob']
                     hl_ob_row_sum = np.concatenate((ll_ob_to_hl_ob_row_sum,hl_ob_to_hl_ob_row_sum,ll_ac_to_hl_ob_row_sum,ml_ac_to_hl_ob_row_sum,tl_ac_to_hl_ob_row_sum),axis=1)
                     
                     ll_ob_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ll_ob_num, axis=1))/self.conf['Z_ll_ob_to_ll_ac']
-                    hl_ob_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ll_ac_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_ll_ac
-                    ll_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_ll_ac
-                    ml_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_ll_ac
-                    tl_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_ll_ac
+                    hl_ob_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ll_ac_num,1).repeat(hl_ob_num, axis=1))/self.conf['Z_hl_ob_to_ll_ac']
+                    ll_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ll_ac_num, axis=1))/self.conf['Z_ll_ac_to_ll_ac']
+                    ml_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(ml_ac_num, axis=1))/self.conf['Z_ml_ac_to_ll_ac']
+                    tl_ac_to_ll_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ll_ac_begin:ll_ac_begin+ll_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ll_ac_num,1).repeat(tl_ac_num, axis=1))/self.conf['Z_tl_ac_to_ll_ac']
                     ll_ac_row_sum = np.concatenate((ll_ob_to_ll_ac_row_sum,hl_ob_to_ll_ac_row_sum,ll_ac_to_ll_ac_row_sum,ml_ac_to_ll_ac_row_sum,tl_ac_to_ll_ac_row_sum),axis=1)
                     
-                    ll_ob_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_ml_ac
-                    hl_ob_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ml_ac_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_ml_ac
-                    ll_ac_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_ml_ac
-                    ml_ac_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_ml_ac
-                    tl_ac_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_ml_ac
+                    ll_ob_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ll_ob_num, axis=1))/self.conf['Z_ll_ob_to_ml_ac']
+                    hl_ob_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(ml_ac_num,1).repeat(hl_ob_num, axis=1))/self.conf['Z_hl_ob_to_ml_ac']
+                    ll_ac_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ll_ac_num, axis=1))/self.conf['Z_ll_ac_to_ml_ac']
+                    ml_ac_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(ml_ac_num, axis=1))/self.conf['Z_ml_ac_to_ml_ac']
+                    tl_ac_to_ml_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][ml_ac_begin:ml_ac_begin+ml_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(ml_ac_num,1).repeat(tl_ac_num, axis=1))/self.conf['Z_tl_ac_to_ml_ac']
                     ml_ac_row_sum = np.concatenate((ll_ob_to_ml_ac_row_sum,hl_ob_to_ml_ac_row_sum,ll_ac_to_ml_ac_row_sum,ml_ac_to_ml_ac_row_sum,tl_ac_to_ml_ac_row_sum),axis=1)
                     
-                    ll_ob_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_tl_ac
-                    hl_ob_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(tl_ac_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_tl_ac
-                    ll_ac_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_tl_ac
-                    ml_ac_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_tl_ac
-                    tl_ac_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_tl_ac
+                    ll_ob_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ll_ob_num, axis=1))/self.conf['Z_ll_ob_to_tl_ac']
+                    hl_ob_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(tl_ac_num,1).repeat(hl_ob_num, axis=1))/self.conf['Z_hl_ob_to_tl_ac']
+                    ll_ac_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ll_ac_num, axis=1))/self.conf['Z_ll_ac_to_tl_ac']
+                    ml_ac_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(ml_ac_num, axis=1))/self.conf['Z_ml_ac_to_tl_ac']
+                    tl_ac_to_tl_ac_row_sum = (self.synapse_strength[post_layer][pre_layer][tl_ac_begin:tl_ac_begin+tl_ac_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(tl_ac_num,1).repeat(tl_ac_num, axis=1))/self.conf['Z_tl_ac_to_tl_ac']
                     tl_ac_row_sum = np.concatenate((ll_ob_to_tl_ac_row_sum,hl_ob_to_tl_ac_row_sum,ll_ac_to_tl_ac_row_sum,ml_ac_to_tl_ac_row_sum,tl_ac_to_tl_ac_row_sum),axis=1)
                     
-                    ll_ob_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(iin_num,1).repeat(ll_ob_num, axis=1))/Z_ll_ob_to_in
-                    hl_ob_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(iin_num,1).repeat(hl_ob_num, axis=1))/Z_hl_ob_to_in
-                    ll_ac_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(iin_num,1).repeat(ll_ac_num, axis=1))/Z_ll_ac_to_in
-                    ml_ac_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(iin_num,1).repeat(ml_ac_num, axis=1))/Z_ml_ac_to_in
-                    tl_ac_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(iin_num,1).repeat(tl_ac_num, axis=1))/Z_tl_ac_to_in
+                    ll_ob_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ll_ob_begin:ll_ob_begin+ll_ob_num].sum(axis=1).reshape(iin_num,1).repeat(ll_ob_num, axis=1))/self.conf['Z_ll_ob_to_in']
+                    hl_ob_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,hl_ob_begin:hl_ob_begin+hl_ob_num].sum(axis=1).reshape(iin_num,1).repeat(hl_ob_num, axis=1))/self.conf['Z_hl_ob_to_in']
+                    ll_ac_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ll_ac_begin:ll_ac_begin+ll_ac_num].sum(axis=1).reshape(iin_num,1).repeat(ll_ac_num, axis=1))/self.conf['Z_ll_ac_to_in']
+                    ml_ac_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,ml_ac_begin:ml_ac_begin+ml_ac_num].sum(axis=1).reshape(iin_num,1).repeat(ml_ac_num, axis=1))/self.conf['Z_ml_ac_to_in']
+                    tl_ac_to_in_row_sum = (self.synapse_strength[post_layer][pre_layer][excitatory_unit_num:unit_num,tl_ac_begin:tl_ac_begin+tl_ac_num].sum(axis=1).reshape(iin_num,1).repeat(tl_ac_num, axis=1))/self.conf['Z_tl_ac_to_in']
                     in_from_ex_row_sum = np.concatenate((ll_ob_to_in_row_sum,hl_ob_to_in_row_sum,ll_ac_to_in_row_sum,ml_ac_to_in_row_sum,tl_ac_to_in_row_sum),axis=1)
                     
                     excitatory_row_sums = np.concatenate((ll_ob_row_sum,hl_ob_row_sum,ll_ac_row_sum,ml_ac_row_sum,tl_ac_row_sum,in_from_ex_row_sum),axis=0)
@@ -399,7 +446,7 @@ class ModelClass:
                     row_sums[row_sums == 0] = 1
                     self.synapse_strength[post_layer][pre_layer] = self.synapse_strength[post_layer][pre_layer]/row_sums
                 if SENSORY_RESPONSE_CONNECTION and post_layer == layer_num-1 and pre_layer == 0:
-                    normalized_weight = Z_sensory_response
+                    normalized_weight = self.conf['Z_sensory_response']
                     # Sensory neurons directly innervate response neurons
                     for unit_ind in range(unit_num):
                         self.synapse_strength[post_layer][pre_layer][unit_ind,unit_ind] = normalized_weight
@@ -410,7 +457,7 @@ class ModelClass:
                     self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ac_begin:hl_ac_begin+hl_ac_num][self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ac_begin:hl_ac_begin+hl_ac_num] < 0] = 0
                     
                     # Normalize incoming weights to each unit
-                    normalizing_factor = Z_response_prediction
+                    normalizing_factor = self.conf['Z_response_prediction']
                     row_sums = (self.synapse_strength[post_layer][pre_layer][hl_ob_begin:hl_ob_begin+hl_ob_num,hl_ac_begin:hl_ac_begin+hl_ac_num].sum(axis=1).reshape(hl_ob_num,1).repeat(hl_ac_num, axis=1))/normalizing_factor
                     row_sums = np.pad(row_sums, ((hl_ob_begin,unit_num-hl_ob_begin-hl_ob_num),(hl_ac_begin,unit_num-hl_ac_begin-hl_ac_num)), 'constant')
                     row_sums[row_sums == 0] = 1
@@ -466,11 +513,11 @@ class ModelClass:
                     for first_iin in range(unit_num-iin_num, unit_num):
                         for second_iin in range(first_iin+1, unit_num):
                             # Check if iins where synched in the last sync window
-                            if len(fire_history[response_layer][first_iin]) < iin_sync_window or len(fire_history[response_layer][second_iin]) < iin_sync_window:
+                            if len(fire_history[response_layer][first_iin]) < self.conf['iin_sync_window'] or len(fire_history[response_layer][second_iin]) < self.conf['iin_sync_window']:
                                 # Not enough firing- still can't determine synchronization
                                 continue
-                            intersection_of_last_window = [x for x in fire_history[response_layer][first_iin][-iin_sync_window:] if x in fire_history[response_layer][second_iin][-iin_sync_window:]]
-                            if len(intersection_of_last_window) >= iin_sync_threshold:
+                            intersection_of_last_window = [x for x in fire_history[response_layer][first_iin][-self.conf['iin_sync_window']:] if x in fire_history[response_layer][second_iin][-self.conf['iin_sync_window']:]]
+                            if len(intersection_of_last_window) >= self.conf['iin_sync_threshold']:
                                 synched_iins = [first_iin, second_iin]
                                 break
                         if len(synched_iins) > 0:
@@ -478,7 +525,7 @@ class ModelClass:
                             sync_time_step = t
                             self.my_print('sync time step: ' + str(t))
                             break
-                elif t > sync_time_step+after_iin_sync_waiting:
+                elif t > sync_time_step+self.conf['after_iin_sync_waiting']:
                     ''' After the initial sync, we wait some more time ("after_iin_sync_waiting")
                     to make sure the synchronization is complete.
                     After the waiting, we check if the competition is resolved. '''
@@ -523,9 +570,9 @@ class ModelClass:
     
     def update_synapse_strength_long_term(self, winning_action_list, prev_sensory_input, before_prev_sensory_input, comp_len):
         
-        zeta = comp_len / comp_len_zeta_ratio
+        zeta = comp_len / self.conf['comp_len_zeta_ratio']
         delta_input_strength = np.sum(prev_sensory_input-before_prev_sensory_input)
-        max_possible_input_strength = sensory_input_strength * ll_ob_num
+        max_possible_input_strength = self.conf['sensory_input_strength'] * ll_ob_num
         normalized_delta_input_strength = delta_input_strength / max_possible_input_strength
         total_strength_change = normalized_delta_input_strength * zeta
         before_prev_input_strength = np.sum(before_prev_sensory_input)
@@ -547,8 +594,8 @@ class ModelClass:
         for post_layer in range(layer_num):
             for pre_layer in range(layer_num):
                 post_layer_prev_act = self.prev_act[post_layer]
-                normalizing_excitatory_vec = np.ones((unit_num-iin_num,1)) * gamma_ex
-                normalizing_inhibitory_vec = np.ones((iin_num,1)) * gamma_in
+                normalizing_excitatory_vec = np.ones((unit_num-iin_num,1)) * self.conf['gamma_ex']
+                normalizing_inhibitory_vec = np.ones((iin_num,1)) * self.conf['gamma_in']
                 normalizing_vec = np.concatenate((normalizing_excitatory_vec, normalizing_inhibitory_vec))
                 normalized_post_layer_prev_act = post_layer_prev_act - normalizing_vec
                 
@@ -558,7 +605,7 @@ class ModelClass:
                 # Strengthen inhibitory neurons weights by making them more negative (and not more positive)
                 update_mat[:,-iin_num:] = (-1) * update_mat[:,-iin_num:]
                     
-                self.synapse_strength[post_layer][pre_layer] = self.synapse_strength[post_layer][pre_layer] + eta * update_mat
+                self.synapse_strength[post_layer][pre_layer] = self.synapse_strength[post_layer][pre_layer] + self.conf['eta'] * update_mat
         
         self.fix_synapse_strength()
         
@@ -581,7 +628,7 @@ class ModelClass:
             if (not TL_AC_INNERVATION) and (post_layer == layer_num-1):
                 # The response neuron of the top level action is not innervated, so we should innervate it from outside
                 top_level_action_begin = ll_ob_num+hl_ob_num+ll_ac_num+ml_ac_num
-                cur_input[top_level_action_begin+active_tl_ac_node,0] = sensory_input_strength
+                cur_input[top_level_action_begin+active_tl_ac_node,0] = self.conf['sensory_input_strength']
                 
             ''' Accumulating input and refractory period: If a neuron fired in the last time step,
             we subtract its previous input from its current input. Otherwise- we add its previous
@@ -644,11 +691,11 @@ class ModelClass:
     
     def excitatory_activation_function(self, x):
         # Linear activation function for excitatory neurons 
-        return 0 + (x >= excitatory_threshold)
+        return 0 + (x >= self.conf['excitatory_threshold'])
     
     def inhibitory_activation_function(self, x):
         # Linear activation function for inhibitory neurons
-        return 0 + (x >= inhibitory_threshold)
+        return 0 + (x >= self.conf['inhibitory_threshold'])
 
 #######################
 # Simulator functions #
@@ -795,7 +842,6 @@ def generate_state_from_simulator(world, cur_player, goals):
             state_vector[floor_int] = dist_val*(1 - (relative_angle - floor_int))
             state_vector[(floor_int + 1) % ll_ac_num] = dist_val*(relative_angle - floor_int)
     
-    state_vector *= sensory_input_strength
     return state_vector
 
 def get_shortest_path_to_target_len(player, goal):
@@ -964,6 +1010,7 @@ def calibrate_competition_parameters(configuration):
         model = ModelClass(configuration,False,True)
         
         input_vec = generate_state_from_simulator(world, initial_player, goals)
+        input_vec *= model.conf['sensory_input_strength']
         winner_list, _, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,True)
         output_code = analyze_competition(winner_list, fire_history[response_layer][action_begin_loc:action_begin_loc+ll_ac_num])
         
@@ -1039,8 +1086,8 @@ def calibrate_brain_parameters(configuration):
     losers, but we want to do it while maximizing Z_in (which is statistically proven to
     promote good separation). So we start with a very high Z_in, and try it. If it's too
     high- we'll lower it down and stop when we first see good results. '''
-    configuration['Z_in'] = (iin_num/unit_num) * excitatory_threshold * 20
-    highest_Z_ll_ob_to_ll_ac_possible = 0.6 * Z_ex
+    configuration['Z_in'] = (iin_num/unit_num) * ModelClass.default_configuration['excitatory_threshold'] * 20
+    highest_Z_ll_ob_to_ll_ac_possible = 0.6 * ModelClass.default_configuration['Z_ex']
     configuration['Z_ll_ob_to_ll_ac'] = highest_Z_ll_ob_to_ll_ac_possible
     
     # Competition parameters- irrelevant for now
@@ -1090,10 +1137,10 @@ def calibrate_brain_parameters(configuration):
         if low_firing_rate_count > (window_len - good_parameters_threshold):
             # Low firing rate- we need to fix the problem
             print('Firing rate is too low- changing parameters')
-            if configuration['Z_ll_ob_to_ll_ac'] + 0.02 * Z_ex > highest_Z_ll_ob_to_ll_ac_possible:
-                configuration['Z_in'] = configuration['Z_in'] - (iin_num/unit_num) * excitatory_threshold
+            if configuration['Z_ll_ob_to_ll_ac'] + 0.02 * ModelClass.default_configuration['Z_ex'] > highest_Z_ll_ob_to_ll_ac_possible:
+                configuration['Z_in'] = configuration['Z_in'] - (iin_num/unit_num) * ModelClass.default_configuration['excitatory_threshold']
             else:
-                configuration['Z_ll_ob_to_ll_ac'] = configuration['Z_ll_ob_to_ll_ac'] + 0.02 * Z_ex
+                configuration['Z_ll_ob_to_ll_ac'] = configuration['Z_ll_ob_to_ll_ac'] + 0.02 * ModelClass.default_configuration['Z_ex']
             
             normal_count = 0
             low_firing_rate_count = 0
@@ -1102,8 +1149,8 @@ def calibrate_brain_parameters(configuration):
         if high_firing_rate_count > (window_len - good_parameters_threshold):
             # High firing rate- we need to fix the problem
             print('Firing rate is too high- changing parameters')
-            configuration['Z_in'] = configuration['Z_in'] + (iin_num/unit_num) * excitatory_threshold
-            configuration['Z_ll_ob_to_ll_ac'] = configuration['Z_ll_ob_to_ll_ac'] - 0.02 * Z_ex
+            configuration['Z_in'] = configuration['Z_in'] + (iin_num/unit_num) * ModelClass.default_configuration['excitatory_threshold']
+            configuration['Z_ll_ob_to_ll_ac'] = configuration['Z_ll_ob_to_ll_ac'] - 0.02 * ModelClass.default_configuration['Z_ex']
             
             normal_count = 0
             low_firing_rate_count = 0
@@ -1112,7 +1159,7 @@ def calibrate_brain_parameters(configuration):
         if low_firing_rate_count > 1 and high_firing_rate_count > 1:
             # No separation. We need more inhibition
             print('Firing rates are not separated- changing parameters')
-            configuration['Z_in'] = configuration['Z_in'] + (iin_num/unit_num) * excitatory_threshold
+            configuration['Z_in'] = configuration['Z_in'] + (iin_num/unit_num) * ModelClass.default_configuration['excitatory_threshold']
             
             normal_count = 0
             low_firing_rate_count = 0
