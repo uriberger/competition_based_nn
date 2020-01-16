@@ -19,7 +19,7 @@ IIN_PROJECTIONS = False
 IIN_FAST_CONNECTIONS_FACTOR = 1
 
 # Direct connection between the sensory and response layers
-SENSORY_RESPONSE_CONNECTION = True
+SENSORY_RESPONSE_CONNECTION = False
 
 # High-level action response neurons innervate high-level object prediction neurons
 HL_AC_RESPONSE_HL_OB_PREDICTION_CONNECTION = False
@@ -49,7 +49,7 @@ layer_num = 5
 response_layer = layer_num-1
 #response_layer = 1
 
-active_tl_ac_node = 28
+active_tl_ac_node = 0
 
 # Competition parameters
 default_competition_len = 20000
@@ -63,16 +63,16 @@ class ModelClass:
         'sensory_input_strength' : 0.13333,
         
         # Competition parameters
-        'ex_sync_window' : 95,
-        'ex_sync_threshold' : 6,
+        'ex_sync_window' : 50,
+        'ex_sync_threshold' : 10,
         'ex_unsync_threshold' : 1,
         'iin_sync_window' : 20,
         'iin_sync_threshold' : 15,
         'after_iin_sync_waiting' : 2000,
         
         # Normalization parameter
-        'Z_ex_ex_th_ratio' : 2,
-        'Z_in_ex_th_ratio' : 2,
+        'Z_ex_ex_th_ratio' : 1,
+        'Z_in_ex_th_ratio' : 15,
         
         'Z_ll_ob_to_ll_ob_Z_ex_ratio' : 0.1,
         'Z_hl_ob_to_ll_ob_Z_ex_ratio' : 0.6,
@@ -86,7 +86,7 @@ class ModelClass:
         'Z_ml_ac_to_hl_ob_Z_ex_ratio' : 0.1,
         'Z_tl_ac_to_hl_ob_Z_ex_ratio' : 0.1,
         
-        'Z_ll_ob_to_ll_ac_Z_ex_ratio' : 0.51,
+        'Z_ll_ob_to_ll_ac_Z_ex_ratio' : 0.3,
         'Z_hl_ob_to_ll_ac_Z_ex_ratio' : 0.1,
         'Z_ll_ac_to_ll_ac_Z_ex_ratio' : 0.1,
         'Z_ml_ac_to_ll_ac_Z_ex_ratio' : 0.4,
@@ -110,8 +110,8 @@ class ModelClass:
         'Z_ml_ac_to_in_Z_ex_ratio' : 0.2,
         'Z_tl_ac_to_in_Z_ex_ratio' : 0.2,
         
-        'Z_forward_ex_th_ratio' : 0.3,
-        'Z_backward_ex_th_ratio' : 0.1,
+        'Z_forward_ex_th_ratio' : 0.6,
+        'Z_backward_ex_th_ratio' : 0.4,
         'Z_sensory_response_ex_th_ratio' : 0.2,
         'Z_response_prediction_ex_th_ratio' : 0.2,
     
@@ -498,6 +498,7 @@ class ModelClass:
             else:
                 self.prop_external_input(input_vec)
                 remaining_inhibitory_iterations = IIN_FAST_CONNECTIONS_FACTOR-1
+                
             # Document fire history
             for l in range(layer_num):
                 for unit_ind in range(unit_num):
@@ -1118,6 +1119,7 @@ def calibrate_brain_parameters(configuration):
         action_begin_loc = ll_ob_num+hl_ob_num
         
         input_vec = generate_state_from_simulator(world, initial_player, goals)
+        input_vec *= model.conf['sensory_input_strength']
         _, competition_len, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,False)
         output_code = analyze_fire_history(fire_history[response_layer][action_begin_loc:action_begin_loc+ll_ac_num], competition_len)
         
@@ -1211,6 +1213,7 @@ def main(load_from_file, configuration):
     for i in range(max_rounds):
         prev_sensory_input_vec = sensory_input_vec
         sensory_input_vec = generate_state_from_simulator(world, cur_player, goals)
+        sensory_input_vec *= model.conf['sensory_input_strength']
         if not quiet:
             print('sensory input vec: ' + str((sensory_input_vec.transpose() > 0).astype(int)))
         if i > 0:
@@ -1238,6 +1241,7 @@ def main(load_from_file, configuration):
         if new_player_loc in goals:
             prev_sensory_input_vec = sensory_input_vec
             sensory_input_vec = generate_state_from_simulator(world, cur_player, goals)
+            sensory_input_vec *= model.conf['sensory_input_strength']
             if not quiet:
                 print('sensory input vec: ' + str((sensory_input_vec.transpose() > 0).astype(int)))
             model.update_synapse_strength_long_term(winner_list, sensory_input_vec, prev_sensory_input_vec, comp_len)
