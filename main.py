@@ -63,16 +63,16 @@ class ModelClass:
         'sensory_input_strength' : 0.13333,
         
         # Competition parameters
-        'ex_sync_window' : 70,
-        'ex_sync_threshold' : 8,
+        'ex_sync_window' : 80,
+        'ex_sync_threshold' : 6,
         'ex_unsync_threshold' : 1,
         'iin_sync_window' : 20,
         'iin_sync_threshold' : 15,
         'after_iin_sync_waiting' : 2000,
         
         # Normalization parameter
-        'Z_ex_ex_th_ratio' : 2,
-        'Z_in_ex_th_ratio' : 15,
+        'Z_ex_ex_th_ratio' : 2.4,
+        'Z_in_ex_th_ratio' : 19,
         
         'Z_ll_ob_to_ll_ob_Z_ex_ratio' : 0.1,
         'Z_hl_ob_to_ll_ob_Z_ex_ratio' : 0.6,
@@ -110,8 +110,8 @@ class ModelClass:
         'Z_ml_ac_to_in_Z_ex_ratio' : 0.2,
         'Z_tl_ac_to_in_Z_ex_ratio' : 0.2,
         
-        'Z_forward_ex_th_ratio' : 0.4,
-        'Z_backward_ex_th_ratio' : 0.2,
+        'Z_forward_ex_th_ratio' : 0.46,
+        'Z_backward_ex_th_ratio' : 0.275,
         'Z_sensory_response_ex_th_ratio' : 0.2,
         'Z_response_prediction_ex_th_ratio' : 0.2,
     
