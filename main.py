@@ -19,7 +19,7 @@ IIN_PROJECTIONS = False
 IIN_FAST_CONNECTIONS_FACTOR = 1
 
 # Direct connection between the sensory and response layers
-SENSORY_RESPONSE_CONNECTION = False
+SENSORY_RESPONSE_CONNECTION = True
 
 # High-level action response neurons innervate high-level object prediction neurons
 HL_AC_RESPONSE_HL_OB_PREDICTION_CONNECTION = False
@@ -63,15 +63,15 @@ class ModelClass:
         'sensory_input_strength' : 0.13333,
         
         # Competition parameters
-        'ex_sync_window' : 50,
-        'ex_sync_threshold' : 10,
+        'ex_sync_window' : 70,
+        'ex_sync_threshold' : 8,
         'ex_unsync_threshold' : 1,
         'iin_sync_window' : 20,
         'iin_sync_threshold' : 15,
         'after_iin_sync_waiting' : 2000,
         
         # Normalization parameter
-        'Z_ex_ex_th_ratio' : 1,
+        'Z_ex_ex_th_ratio' : 2,
         'Z_in_ex_th_ratio' : 15,
         
         'Z_ll_ob_to_ll_ob_Z_ex_ratio' : 0.1,
@@ -110,8 +110,8 @@ class ModelClass:
         'Z_ml_ac_to_in_Z_ex_ratio' : 0.2,
         'Z_tl_ac_to_in_Z_ex_ratio' : 0.2,
         
-        'Z_forward_ex_th_ratio' : 0.6,
-        'Z_backward_ex_th_ratio' : 0.4,
+        'Z_forward_ex_th_ratio' : 0.4,
+        'Z_backward_ex_th_ratio' : 0.2,
         'Z_sensory_response_ex_th_ratio' : 0.2,
         'Z_response_prediction_ex_th_ratio' : 0.2,
     
@@ -159,7 +159,7 @@ class ModelClass:
                 self.synapse_strength.append(post_layer_synapses)
             
             # Hard coded good weights
-            '''for layer in range(layer_num):
+            for layer in range(layer_num):
                 ll_act_begin = ll_ob_num+hl_ob_num
                 self.synapse_strength[layer][layer][ll_act_begin,0] = 0
                 self.synapse_strength[layer][layer][ll_act_begin,1] = 1
@@ -247,7 +247,7 @@ class ModelClass:
                 self.synapse_strength[layer][layer][ll_act_begin+7,6] = 0
                 self.synapse_strength[layer][layer][ll_act_begin+7,7] = 0
                 self.synapse_strength[layer][layer][ll_act_begin+7,8] = 0
-                self.synapse_strength[layer][layer][ll_act_begin+7,9] = 0'''
+                self.synapse_strength[layer][layer][ll_act_begin+7,9] = 0
                 
         else:
             file_name = "synapse_strength"
@@ -858,9 +858,9 @@ def evaluate(world, goals, cur_player, iter_num, shortest_path_len, max_rounds_n
         my_dist = ((goals[0][0] - cur_player[0])**2 + (goals[0][1] - cur_player[1])**2)**0.5
         return 0.5 - 0.5 * (my_dist/max_possible_dist)
 
-#############################
+##############################
 # Parameter calibration tool #
-#############################
+##############################
 
 class WinnerAnalysisCode(enum.Enum):
     NORMAL = 0
@@ -1087,8 +1087,10 @@ def calibrate_brain_parameters(configuration):
     losers, but we want to do it while maximizing Z_in (which is statistically proven to
     promote good separation). So we start with a very high Z_in, and try it. If it's too
     high- we'll lower it down and stop when we first see good results. '''
+    Z_ex = ModelClass.default_configuration['Z_ex_ex_th_ratio']*ModelClass.default_configuration['excitatory_threshold']
+    
     configuration['Z_in'] = (iin_num/unit_num) * ModelClass.default_configuration['excitatory_threshold'] * 20
-    highest_Z_ll_ob_to_ll_ac_possible = 0.6 * ModelClass.default_configuration['Z_ex']
+    highest_Z_ll_ob_to_ll_ac_possible = 0.6 * Z_ex
     configuration['Z_ll_ob_to_ll_ac'] = highest_Z_ll_ob_to_ll_ac_possible
     
     # Competition parameters- irrelevant for now
@@ -1139,10 +1141,10 @@ def calibrate_brain_parameters(configuration):
         if low_firing_rate_count > (window_len - good_parameters_threshold):
             # Low firing rate- we need to fix the problem
             print('Firing rate is too low- changing parameters')
-            if configuration['Z_ll_ob_to_ll_ac'] + 0.02 * ModelClass.default_configuration['Z_ex'] > highest_Z_ll_ob_to_ll_ac_possible:
+            if configuration['Z_ll_ob_to_ll_ac'] + 0.02 * Z_ex > highest_Z_ll_ob_to_ll_ac_possible:
                 configuration['Z_in'] = configuration['Z_in'] - (iin_num/unit_num) * ModelClass.default_configuration['excitatory_threshold']
             else:
-                configuration['Z_ll_ob_to_ll_ac'] = configuration['Z_ll_ob_to_ll_ac'] + 0.02 * ModelClass.default_configuration['Z_ex']
+                configuration['Z_ll_ob_to_ll_ac'] = configuration['Z_ll_ob_to_ll_ac'] + 0.02 * Z_ex
             
             normal_count = 0
             low_firing_rate_count = 0
@@ -1152,7 +1154,7 @@ def calibrate_brain_parameters(configuration):
             # High firing rate- we need to fix the problem
             print('Firing rate is too high- changing parameters')
             configuration['Z_in'] = configuration['Z_in'] + (iin_num/unit_num) * ModelClass.default_configuration['excitatory_threshold']
-            configuration['Z_ll_ob_to_ll_ac'] = configuration['Z_ll_ob_to_ll_ac'] - 0.02 * ModelClass.default_configuration['Z_ex']
+            configuration['Z_ll_ob_to_ll_ac'] = configuration['Z_ll_ob_to_ll_ac'] - 0.02 * Z_ex
             
             normal_count = 0
             low_firing_rate_count = 0
@@ -1251,24 +1253,24 @@ def main(load_from_file, configuration):
     score = evaluate(world, goals, cur_player, i+1, shortest_path_to_target_len, max_rounds)
     return score
     
-'''scores = []
+scores = []
 epoch_num = 60
 for epoch in range(epoch_num):
-    if not quiet:
-        print('***')
+    print('***')
     print('epoch ' + str(epoch))
-    if not quiet:
-        print('***')
+    print('***')
+    configuration = {}
     
     if epoch == 0:
         load_from_file = False
     else:
         load_from_file = True
-    score = main(load_from_file, None)
+    score = main(load_from_file, configuration)
     scores.append(score)
     
 plt.plot(range(epoch_num), scores)
-plt.savefig('res')'''
+plt.savefig('res')
 
-configuration = {}
-main(False,configuration)
+'''configuration = {}
+calibrate_parameters(configuration)
+print(configuration)'''
