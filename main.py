@@ -45,14 +45,16 @@ excitatory_precentage = 0.8
 iin_num = math.ceil((ll_ob_num+ll_ac_num+hl_ob_num+hl_ac_num) * \
                         (1-excitatory_precentage)/excitatory_precentage)
 unit_num = 40
-layer_num = 5
+#layer_num = 5
+layer_num = 1
 response_layer = layer_num-1
 #response_layer = 1
 
 active_tl_ac_node = 0
 
 # Competition parameters
-default_competition_len = 20000
+#default_competition_len = 20000
+default_competition_len = 10000
 
 class ModelClass:
     
@@ -64,7 +66,7 @@ class ModelClass:
         
         # Competition parameters
         'ex_sync_window' : 80,
-        'ex_sync_threshold' : 6,
+        'ex_sync_threshold' : 10,
         'ex_unsync_threshold' : 1,
         'iin_sync_window' : 20,
         'iin_sync_threshold' : 15,
@@ -110,9 +112,9 @@ class ModelClass:
         'Z_ml_ac_to_in_Z_ex_ratio' : 0.2,
         'Z_tl_ac_to_in_Z_ex_ratio' : 0.2,
         
-        'Z_forward_ex_th_ratio' : 0.46,
-        'Z_backward_ex_th_ratio' : 0.275,
-        'Z_sensory_response_ex_th_ratio' : 0.2,
+        'Z_forward_ex_th_ratio' : 0.4,
+        'Z_backward_ex_th_ratio' : 0.2,
+        'Z_sensory_response_ex_th_ratio' : 0.4,
         'Z_response_prediction_ex_th_ratio' : 0.2,
     
         # Learning parameters
@@ -161,7 +163,7 @@ class ModelClass:
             # Hard coded good weights
             for layer in range(layer_num):
                 ll_act_begin = ll_ob_num+hl_ob_num
-                self.synapse_strength[layer][layer][ll_act_begin,0] = 0
+                '''self.synapse_strength[layer][layer][ll_act_begin,0] = 0
                 self.synapse_strength[layer][layer][ll_act_begin,1] = 1
                 self.synapse_strength[layer][layer][ll_act_begin,2] = 1
                 self.synapse_strength[layer][layer][ll_act_begin,3] = 0
@@ -247,7 +249,7 @@ class ModelClass:
                 self.synapse_strength[layer][layer][ll_act_begin+7,6] = 0
                 self.synapse_strength[layer][layer][ll_act_begin+7,7] = 0
                 self.synapse_strength[layer][layer][ll_act_begin+7,8] = 0
-                self.synapse_strength[layer][layer][ll_act_begin+7,9] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+7,9] = 0'''
                 
         else:
             file_name = "synapse_strength"
@@ -707,6 +709,7 @@ OBST = 0
 nose_length = 2
 world_height = 50
 world_length = 50
+goals = [(24,25)]
 
 def init_world(vertical_size, horizontal_size, obstacle_list):
     world = np.zeros((vertical_size, horizontal_size))
@@ -811,7 +814,7 @@ def print_world(world, player, goal):
     plt.show()
     print(player_loc)
 
-def generate_state_from_simulator(world, cur_player, goals):
+def generate_state_from_simulator(world, cur_player):
     state_vector = np.zeros((ll_ob_num, 1))
     
     for goal in goals:
@@ -1005,12 +1008,11 @@ def calibrate_competition_parameters(configuration):
             starting_loc = (int(np.random.rand() * world_height), int(np.random.rand() * world_length))
         world = init_world(world_height, world_length, [((0,0),1)])
         initial_player = (starting_loc[0],starting_loc[1],0)
-        goals = [(24,25)]
         action_begin_loc = ll_ob_num+hl_ob_num
         
         model = ModelClass(configuration,False,True)
         
-        input_vec = generate_state_from_simulator(world, initial_player, goals)
+        input_vec = generate_state_from_simulator(world, initial_player)
         input_vec *= model.conf['sensory_input_strength']
         winner_list, _, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,True)
         output_code = analyze_competition(winner_list, fire_history[response_layer][action_begin_loc:action_begin_loc+ll_ac_num])
@@ -1194,7 +1196,6 @@ def main(load_from_file, configuration):
         starting_loc = (int(np.random.rand() * world_height), int(np.random.rand() * world_length))
     world = init_world(world_height, world_length, [((0,0),1)])
     initial_player = (starting_loc[0],starting_loc[1],0)
-    goals = [(24,25)]
     
     model = ModelClass(configuration,load_from_file,quiet)
     
@@ -1253,7 +1254,7 @@ def main(load_from_file, configuration):
     score = evaluate(world, goals, cur_player, i+1, shortest_path_to_target_len, max_rounds)
     return score
     
-scores = []
+'''scores = []
 epoch_num = 60
 for epoch in range(epoch_num):
     print('***')
@@ -1269,8 +1270,102 @@ for epoch in range(epoch_num):
     scores.append(score)
     
 plt.plot(range(epoch_num), scores)
-plt.savefig('res')
+plt.savefig('res')'''
 
 '''configuration = {}
 calibrate_parameters(configuration)
 print(configuration)'''
+
+mean_dist = 0
+for i in range(world_height):
+    for j in range(world_height):
+        mean_dist += (1/(world_height*world_length))*((i-goals[0][0])**2+(j-goals[0][1])**2)**0.5
+        
+max_distance = (world_height**2 + world_length**2)**0.5
+mean_dist_val = 1-mean_dist/max_distance
+model = ModelClass({},False,True)
+mu_s = (mean_dist_val * model.conf['sensory_input_strength'])/8
+
+T = np.identity(6)
+T = model.conf['excitatory_threshold']*T
+T[5,5] = model.conf['inhibitory_threshold']
+
+Z = np.zeros((6,6))
+
+Z[0,0] = model.conf['Z_ll_ob_to_ll_ob']
+Z[0,1] = model.conf['Z_hl_ob_to_ll_ob']
+Z[0,2] = model.conf['Z_ll_ac_to_ll_ob']
+Z[0,3] = model.conf['Z_ml_ac_to_ll_ob']
+Z[0,4] = model.conf['Z_tl_ac_to_ll_ob']
+Z[0,5] = (-1)*(model.conf['Z_in'])
+
+Z[1,0] = model.conf['Z_ll_ob_to_hl_ob']
+Z[1,1] = model.conf['Z_hl_ob_to_hl_ob']
+Z[1,2] = model.conf['Z_ll_ac_to_hl_ob']
+Z[1,3] = model.conf['Z_ml_ac_to_hl_ob']
+Z[1,4] = model.conf['Z_tl_ac_to_hl_ob']
+Z[1,5] = (-1)*(model.conf['Z_in'])
+
+Z[2,0] = model.conf['Z_ll_ob_to_ll_ac']
+Z[2,1] = model.conf['Z_hl_ob_to_ll_ac']
+Z[2,2] = model.conf['Z_ll_ac_to_ll_ac']
+Z[2,3] = model.conf['Z_ml_ac_to_ll_ac']
+Z[2,4] = model.conf['Z_tl_ac_to_ll_ac']
+Z[2,5] = (-1)*(model.conf['Z_in'])
+
+Z[3,0] = model.conf['Z_ll_ob_to_ml_ac']
+Z[3,1] = model.conf['Z_hl_ob_to_ml_ac']
+Z[3,2] = model.conf['Z_ll_ac_to_ml_ac']
+Z[3,3] = model.conf['Z_ml_ac_to_ml_ac']
+Z[3,4] = model.conf['Z_tl_ac_to_ml_ac']
+Z[3,5] = (-1)*(model.conf['Z_in'])
+
+Z[4,0] = model.conf['Z_ll_ob_to_tl_ac']
+Z[4,1] = model.conf['Z_hl_ob_to_tl_ac']
+Z[4,2] = model.conf['Z_ll_ac_to_tl_ac']
+Z[4,3] = model.conf['Z_ml_ac_to_tl_ac']
+Z[4,4] = model.conf['Z_tl_ac_to_tl_ac']
+Z[4,5] = (-1)*(model.conf['Z_in'])
+
+Z[5,0] = model.conf['Z_ll_ob_to_in']
+Z[5,1] = model.conf['Z_hl_ob_to_in']
+Z[5,2] = model.conf['Z_ll_ac_to_in']
+Z[5,3] = model.conf['Z_ml_ac_to_in']
+Z[5,4] = model.conf['Z_tl_ac_to_in']
+Z[5,5] = (-1)*(model.conf['Z_in'])
+
+b = np.zeros((6,1))
+b[0,0] = (-1)*mu_s
+
+iter_num = 5000
+fire_rate = np.zeros((unit_num,1))
+for cur_iter in range(iter_num):
+    model = ModelClass({},False,True)
+    print('Starting iter ' + str(cur_iter))
+    starting_loc = (int(np.random.rand() * world_height), int(np.random.rand() * world_length))
+    world = init_world(world_height, world_length, [((0,0),1)])
+    initial_player = (starting_loc[0],starting_loc[1],0)
+    action_begin_loc = ll_ob_num+hl_ob_num
+    
+    input_vec = generate_state_from_simulator(world, initial_player)
+    input_vec *= model.conf['sensory_input_strength']
+    _, _, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,False)
+    fire_count = np.array([len(a) for a in fire_history[0]]).reshape((unit_num,1))
+    fire_rate += fire_count / default_competition_len
+fire_rate /= iter_num
+zone_fire_rate = np.zeros((6,1))
+ll_ob_begin = 0
+hl_ob_begin = ll_ob_begin + ll_ob_num
+ll_ac_begin = hl_ob_begin + hl_ob_num
+ml_ac_begin = ll_ac_begin + ll_ac_num
+tl_ac_begin = ml_ac_begin + ml_ac_num
+in_begin = tl_ac_begin + tl_ac_num
+zone_fire_rate[0,0] = np.sum(fire_rate[ll_ob_begin:ll_ob_begin+ll_ob_num,0])/ll_ob_num
+zone_fire_rate[1,0] = np.sum(fire_rate[hl_ob_begin:hl_ob_begin+hl_ob_num,0])/hl_ob_num
+zone_fire_rate[2,0] = np.sum(fire_rate[ll_ac_begin:ll_ac_begin+ll_ac_num,0])/ll_ac_num
+zone_fire_rate[3,0] = np.sum(fire_rate[ml_ac_begin:ml_ac_begin+ml_ac_num,0])/ml_ac_num
+zone_fire_rate[4,0] = np.sum(fire_rate[tl_ac_begin:tl_ac_begin+tl_ac_num,0])/tl_ac_num
+zone_fire_rate[5,0] = np.sum(fire_rate[in_begin:in_begin+iin_num,0])/iin_num
+    
+print(np.linalg.solve((Z-T),b).transpose())
+print(zone_fire_rate.transpose())
