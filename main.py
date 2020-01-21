@@ -35,16 +35,16 @@ SPATIAL_IINS = False
 ###################
 
 # General parameters
-ll_ob_num = 10
+ll_ob_num = 8
 ll_ac_num = 8
-hl_ob_num = 7
+hl_ob_num = 9
 ml_ac_num = 3
 tl_ac_num = 4
 hl_ac_num = ml_ac_num+tl_ac_num
 excitatory_precentage = 0.8
 iin_num = math.ceil((ll_ob_num+ll_ac_num+hl_ob_num+hl_ac_num) * \
                         (1-excitatory_precentage)/excitatory_precentage)
-unit_num = 40
+unit_num = ll_ob_num + ll_ac_num + hl_ob_num + ml_ac_num + tl_ac_num + iin_num
 layer_num = 5
 response_layer = layer_num-1
 #response_layer = 1
@@ -159,7 +159,7 @@ class ModelClass:
                 self.synapse_strength.append(post_layer_synapses)
             
             # Hard coded good weights
-            for layer in range(layer_num):
+            '''for layer in range(layer_num):
                 ll_act_begin = ll_ob_num+hl_ob_num
                 self.synapse_strength[layer][layer][ll_act_begin,0] = 0
                 self.synapse_strength[layer][layer][ll_act_begin,1] = 1
@@ -247,7 +247,7 @@ class ModelClass:
                 self.synapse_strength[layer][layer][ll_act_begin+7,6] = 0
                 self.synapse_strength[layer][layer][ll_act_begin+7,7] = 0
                 self.synapse_strength[layer][layer][ll_act_begin+7,8] = 0
-                self.synapse_strength[layer][layer][ll_act_begin+7,9] = 0
+                self.synapse_strength[layer][layer][ll_act_begin+7,9] = 0'''
                 
         else:
             file_name = "synapse_strength"
@@ -818,30 +818,26 @@ def generate_state_from_simulator(world, cur_player, goals):
         row_diff = goal[0]-cur_player[0]
         col_diff = goal[1]-cur_player[1]
         
-        if row_diff == 0 and col_diff == 0:
-            state_vector[-1] = 1
-            state_vector[-2] = 1
+        if col_diff > 0:
+            offset = math.pi/2
         else:
-            if col_diff > 0:
-                offset = math.pi/2
-            else:
-                offset = 3*(math.pi/2)
-            if col_diff == 0:
-                row_col_ratio = math.inf
-            else:
-                row_col_ratio = row_diff/col_diff
-            
-            dist_from_goal = (row_diff**2 + col_diff**2)**0.5
-            max_distance = (world.shape[0]**2 + world.shape[1]**2)**0.5
-            normalized_distance = dist_from_goal / max_distance
-            dist_val = (-1)*normalized_distance + 1    
-            
-            angle_to_goal = np.arctan(row_col_ratio) + offset
-            normalized_angle = (angle_to_goal / (math.pi/4)) % 8
-            relative_angle = (normalized_angle - cur_player[2]) % 8
-            floor_int = int(relative_angle)
-            state_vector[floor_int] = dist_val*(1 - (relative_angle - floor_int))
-            state_vector[(floor_int + 1) % ll_ac_num] = dist_val*(relative_angle - floor_int)
+            offset = 3*(math.pi/2)
+        if col_diff == 0:
+            row_col_ratio = math.inf
+        else:
+            row_col_ratio = row_diff/col_diff
+        
+        dist_from_goal = (row_diff**2 + col_diff**2)**0.5
+        max_distance = (world.shape[0]**2 + world.shape[1]**2)**0.5
+        normalized_distance = dist_from_goal / max_distance
+        dist_val = (-1)*normalized_distance + 1    
+        
+        angle_to_goal = np.arctan(row_col_ratio) + offset
+        normalized_angle = (angle_to_goal / (math.pi/4)) % 8
+        relative_angle = (normalized_angle - cur_player[2]) % 8
+        floor_int = int(relative_angle)
+        state_vector[floor_int] = dist_val*(1 - (relative_angle - floor_int))
+        state_vector[(floor_int + 1) % ll_ac_num] = dist_val*(relative_angle - floor_int)
     
     return state_vector
 
