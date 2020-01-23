@@ -79,7 +79,7 @@ class ModelClass:
         self.conf['Z_ex'] = self.conf['Z_ex_ex_th_ratio'] * self.conf['excitatory_threshold']
         self.conf['Z_iin'] = (1-excitatory_precentage)*self.conf['excitatory_threshold']*self.conf['Z_in_ex_th_ratio']
         self.conf['Z_inp'] = self.conf['Z_inp_Z_ex_ratio']*self.conf['Z_ex']
-        self.conf['Z_inp'] = self.conf['Z_ex'] - self.conf['Z_inp']
+        self.conf['Z_out'] = self.conf['Z_ex'] - self.conf['Z_inp']
     
     def fix_synapse_strength(self):
         # Normalize the synapses strength, and enforce the invariants.
@@ -186,7 +186,7 @@ class ModelClass:
         return 0 + (x >= self.conf['inhibitory_threshold'])
 
 def generate_random_sensory_input():
-    sensory_input_vec = np.random.rand((input_size,1))
+    sensory_input_vec = np.random.rand(input_size,1)
     return sensory_input_vec
 
 #############
