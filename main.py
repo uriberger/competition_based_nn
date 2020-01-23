@@ -1187,9 +1187,10 @@ def main(load_from_file, configuration):
     
     starting_loc = (0,0)
     while starting_loc == (0,0):
-        starting_loc = (int(np.random.rand() * world_height), int(np.random.rand() * world_length))
+        starting_loc = (np.random.randint(world_height), np.random.randint(world_length))
+    starting_direction = np.random.randint(8)
     world = init_world(world_height, world_length, [((0,0),1)])
-    initial_player = (starting_loc[0],starting_loc[1],0)
+    initial_player = (starting_loc[0],starting_loc[1],starting_direction)
     goals = [(24,25)]
     
     model = ModelClass(configuration,load_from_file,quiet)
