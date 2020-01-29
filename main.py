@@ -41,19 +41,16 @@ hl_ob_num = 9
 ml_ac_num = 3
 tl_ac_num = 4
 hl_ac_num = ml_ac_num+tl_ac_num
-excitatory_precentage = 0.8
-iin_num = math.ceil((ll_ob_num+ll_ac_num+hl_ob_num+hl_ac_num) * \
-                        (1-excitatory_precentage)/excitatory_precentage)
+iin_num = 4
 
 unit_num = ll_ob_num + ll_ac_num + hl_ob_num + ml_ac_num + tl_ac_num + iin_num
-layer_num = 1
+layer_num = 2
 response_layer = layer_num-1
 #response_layer = 1
 
 active_tl_ac_node = 0
 
 # Competition parameters
-#default_competition_len = 20000
 default_competition_len = 10000
 
 class ModelClass:
@@ -62,7 +59,8 @@ class ModelClass:
         # Neuron parameters
         'excitatory_threshold' : 0.4,
         'inhibitory_threshold' : 0.2,
-        'sensory_input_strength' : 0.13333,
+        #'sensory_input_strength' : 0.13333,
+        'sensory_input_strength' : 0.2,
         
         # Competition parameters
         'ex_sync_window' : 80,
@@ -73,8 +71,8 @@ class ModelClass:
         'after_iin_sync_waiting' : 2000,
         
         # Normalization parameter
-        'Z_ex_ex_th_ratio' : 2.4,
-        'Z_in_ex_th_ratio' : 19,
+        'Z_ex_ex_th_ratio' : 1,
+        'Z_in_ex_th_ratio' : 1,
         
         'Z_ll_ob_to_ll_ob_Z_ex_ratio' : 0.1,
         'Z_hl_ob_to_ll_ob_Z_ex_ratio' : 0.6,
@@ -112,8 +110,8 @@ class ModelClass:
         'Z_ml_ac_to_in_Z_ex_ratio' : 0.2,
         'Z_tl_ac_to_in_Z_ex_ratio' : 0.2,
         
-        'Z_forward_ex_th_ratio' : 0.4,
-        'Z_backward_ex_th_ratio' : 0.2,
+        'Z_forward_ex_th_ratio' : 0.5,
+        'Z_backward_ex_th_ratio' : 0.3,
         'Z_sensory_response_ex_th_ratio' : 0.4,
         'Z_response_prediction_ex_th_ratio' : 0.2,
     
@@ -121,7 +119,7 @@ class ModelClass:
         'eta' : 0.0001,
         'comp_len_zeta_ratio' : 1500,
         'gamma_ex' : 0.05,
-        'gamma_in' : 0.14,
+        'gamma_in' : 0.05,
         }
     
     def __init__(self, configuration, load_from_file, quiet):
@@ -304,7 +302,7 @@ class ModelClass:
     def init_normalization_parameters(self):
         # Initialize normalization parameters
         self.conf['Z_ex'] = self.conf['Z_ex_ex_th_ratio'] * self.conf['excitatory_threshold']
-        self.conf['Z_in'] = (1-excitatory_precentage)*self.conf['excitatory_threshold']*self.conf['Z_in_ex_th_ratio']
+        self.conf['Z_in'] = self.conf['Z_in_ex_th_ratio'] * self.conf['excitatory_threshold']
         
         self.conf['Z_ll_ob_to_ll_ob'] = self.conf['Z_ll_ob_to_ll_ob_Z_ex_ratio'] * self.conf['Z_ex']
         self.conf['Z_hl_ob_to_ll_ob'] = self.conf['Z_hl_ob_to_ll_ob_Z_ex_ratio'] * self.conf['Z_ex']
@@ -492,10 +490,16 @@ class ModelClass:
         while True:
             if t % 1000 == 0:
                 self.my_print('t='+str(t))
+            if t % 10000 == 0:
+                print('a')
+                print('a')
+                print('a')
             
             # Propagate external input
             if remaining_inhibitory_iterations > 0:
-                self.prop_external_input(input_vec,True)
+                self.prop_external_input(np.zeros((ll_ob_num,1)))
+                for l in range(layer_num):
+                    self.prev_act[l][:-iin_num] = 0
                 remaining_inhibitory_iterations -= 1
             else:
                 self.prop_external_input(input_vec)
@@ -593,7 +597,7 @@ class ModelClass:
         self.fix_synapse_strength()
                 
     def update_synapse_strength_short_term(self):
-        # Update the synapses strength according the a Hebbian learning rule
+        # Update the synapses strength according a Hebbian learning rule
         for post_layer in range(layer_num):
             for pre_layer in range(layer_num):
                 post_layer_prev_act = self.prev_act[post_layer]
@@ -605,27 +609,23 @@ class ModelClass:
                 pre_layer_before_prev_act = self.before_prev_act[pre_layer]
                 
                 update_mat = np.matmul(normalized_post_layer_prev_act, pre_layer_before_prev_act.transpose())
-                # Strengthen inhibitory neurons weights by making them more negative (and not more positive)
-                update_mat[:,-iin_num:] = (-1) * update_mat[:,-iin_num:]
                     
                 self.synapse_strength[post_layer][pre_layer] = self.synapse_strength[post_layer][pre_layer] + self.conf['eta'] * update_mat
         
         self.fix_synapse_strength()
         
-    def prop_external_input(self, sensory_input_vec, only_inhibitory=False):
+    def prop_external_input(self, sensory_input_vec):
         # Simulate the dynamics of the system for a single time step
         new_act = []
         new_input = []
         
         for post_layer in range(layer_num):
             cur_input = np.zeros((unit_num, 1))
-            if post_layer == 0 and not only_inhibitory:
+            if post_layer == 0:
                 input_from_prev_layer = np.pad(sensory_input_vec, ((0,unit_num-ll_ob_num),(0,0)), 'constant')
                 cur_input = np.add(cur_input, input_from_prev_layer)
             for pre_layer in range(layer_num):
                 input_from_pre_layer = np.matmul(self.synapse_strength[post_layer][pre_layer], self.prev_act[pre_layer])
-                if only_inhibitory:
-                    input_from_pre_layer[:-iin_num,0] = 0
                 cur_input = np.add(cur_input, input_from_pre_layer)
             
             if (not TL_AC_INNERVATION) and (post_layer == layer_num-1):
@@ -642,13 +642,10 @@ class ModelClass:
             # Make sure the input is non-negative
             cur_input = np.where(cur_input>=0, cur_input, 0)
             
-            if only_inhibitory:
-                # Excitatory neurons doesn't change in an only-inhibitory stage
-                cur_input[:-iin_num] = self.prev_input_to_neurons[post_layer][:-iin_num]
-            
             cur_act = np.concatenate((self.excitatory_activation_function(cur_input[:cur_input.shape[0]-iin_num,[0]]),
                                   self.inhibitory_activation_function(cur_input[cur_input.shape[0]-iin_num:,[0]])),
                                   axis=0)
+                
             new_act.append(cur_act)
             new_input.append(cur_input)
         
@@ -1212,7 +1209,7 @@ def main(load_from_file, configuration):
     
     for i in range(max_rounds):
         prev_sensory_input_vec = sensory_input_vec
-        sensory_input_vec = generate_state_from_simulator(world, cur_player, goals)
+        sensory_input_vec = generate_state_from_simulator(world, cur_player)
         sensory_input_vec *= model.conf['sensory_input_strength']
         if not quiet:
             print('sensory input vec: ' + str((sensory_input_vec.transpose() > 0).astype(int)))
@@ -1251,7 +1248,7 @@ def main(load_from_file, configuration):
     score = evaluate(world, goals, cur_player, i+1, shortest_path_to_target_len, max_rounds)
     return score
     
-'''scores = []
+scores = []
 epoch_num = 60
 for epoch in range(epoch_num):
     print('***')
@@ -1267,102 +1264,8 @@ for epoch in range(epoch_num):
     scores.append(score)
     
 plt.plot(range(epoch_num), scores)
-plt.savefig('res')'''
+plt.savefig('res')
 
 '''configuration = {}
 calibrate_parameters(configuration)
 print(configuration)'''
-
-mean_dist = 0
-for i in range(world_height):
-    for j in range(world_height):
-        mean_dist += (1/(world_height*world_length))*((i-goals[0][0])**2+(j-goals[0][1])**2)**0.5
-        
-max_distance = (world_height**2 + world_length**2)**0.5
-mean_dist_val = 1-mean_dist/max_distance
-model = ModelClass({},False,True)
-mu_s = (mean_dist_val * model.conf['sensory_input_strength'])/8
-
-T = np.identity(6)
-T = model.conf['excitatory_threshold']*T
-T[5,5] = model.conf['inhibitory_threshold']
-
-Z = np.zeros((6,6))
-
-Z[0,0] = model.conf['Z_ll_ob_to_ll_ob']
-Z[0,1] = model.conf['Z_hl_ob_to_ll_ob']
-Z[0,2] = model.conf['Z_ll_ac_to_ll_ob']
-Z[0,3] = model.conf['Z_ml_ac_to_ll_ob']
-Z[0,4] = model.conf['Z_tl_ac_to_ll_ob']
-Z[0,5] = (-1)*(model.conf['Z_in'])
-
-Z[1,0] = model.conf['Z_ll_ob_to_hl_ob']
-Z[1,1] = model.conf['Z_hl_ob_to_hl_ob']
-Z[1,2] = model.conf['Z_ll_ac_to_hl_ob']
-Z[1,3] = model.conf['Z_ml_ac_to_hl_ob']
-Z[1,4] = model.conf['Z_tl_ac_to_hl_ob']
-Z[1,5] = (-1)*(model.conf['Z_in'])
-
-Z[2,0] = model.conf['Z_ll_ob_to_ll_ac']
-Z[2,1] = model.conf['Z_hl_ob_to_ll_ac']
-Z[2,2] = model.conf['Z_ll_ac_to_ll_ac']
-Z[2,3] = model.conf['Z_ml_ac_to_ll_ac']
-Z[2,4] = model.conf['Z_tl_ac_to_ll_ac']
-Z[2,5] = (-1)*(model.conf['Z_in'])
-
-Z[3,0] = model.conf['Z_ll_ob_to_ml_ac']
-Z[3,1] = model.conf['Z_hl_ob_to_ml_ac']
-Z[3,2] = model.conf['Z_ll_ac_to_ml_ac']
-Z[3,3] = model.conf['Z_ml_ac_to_ml_ac']
-Z[3,4] = model.conf['Z_tl_ac_to_ml_ac']
-Z[3,5] = (-1)*(model.conf['Z_in'])
-
-Z[4,0] = model.conf['Z_ll_ob_to_tl_ac']
-Z[4,1] = model.conf['Z_hl_ob_to_tl_ac']
-Z[4,2] = model.conf['Z_ll_ac_to_tl_ac']
-Z[4,3] = model.conf['Z_ml_ac_to_tl_ac']
-Z[4,4] = model.conf['Z_tl_ac_to_tl_ac']
-Z[4,5] = (-1)*(model.conf['Z_in'])
-
-Z[5,0] = model.conf['Z_ll_ob_to_in']
-Z[5,1] = model.conf['Z_hl_ob_to_in']
-Z[5,2] = model.conf['Z_ll_ac_to_in']
-Z[5,3] = model.conf['Z_ml_ac_to_in']
-Z[5,4] = model.conf['Z_tl_ac_to_in']
-Z[5,5] = (-1)*(model.conf['Z_in'])
-
-b = np.zeros((6,1))
-b[0,0] = (-1)*mu_s
-
-iter_num = 5000
-fire_rate = np.zeros((unit_num,1))
-for cur_iter in range(iter_num):
-    model = ModelClass({},False,True)
-    print('Starting iter ' + str(cur_iter))
-    starting_loc = (int(np.random.rand() * world_height), int(np.random.rand() * world_length))
-    world = init_world(world_height, world_length, [((0,0),1)])
-    initial_player = (starting_loc[0],starting_loc[1],0)
-    action_begin_loc = ll_ob_num+hl_ob_num
-    
-    input_vec = generate_state_from_simulator(world, initial_player)
-    input_vec *= model.conf['sensory_input_strength']
-    _, _, fire_history = model.calculate_winners(input_vec, action_begin_loc, ll_ac_num,True,False)
-    fire_count = np.array([len(a) for a in fire_history[0]]).reshape((unit_num,1))
-    fire_rate += fire_count / default_competition_len
-fire_rate /= iter_num
-zone_fire_rate = np.zeros((6,1))
-ll_ob_begin = 0
-hl_ob_begin = ll_ob_begin + ll_ob_num
-ll_ac_begin = hl_ob_begin + hl_ob_num
-ml_ac_begin = ll_ac_begin + ll_ac_num
-tl_ac_begin = ml_ac_begin + ml_ac_num
-in_begin = tl_ac_begin + tl_ac_num
-zone_fire_rate[0,0] = np.sum(fire_rate[ll_ob_begin:ll_ob_begin+ll_ob_num,0])/ll_ob_num
-zone_fire_rate[1,0] = np.sum(fire_rate[hl_ob_begin:hl_ob_begin+hl_ob_num,0])/hl_ob_num
-zone_fire_rate[2,0] = np.sum(fire_rate[ll_ac_begin:ll_ac_begin+ll_ac_num,0])/ll_ac_num
-zone_fire_rate[3,0] = np.sum(fire_rate[ml_ac_begin:ml_ac_begin+ml_ac_num,0])/ml_ac_num
-zone_fire_rate[4,0] = np.sum(fire_rate[tl_ac_begin:tl_ac_begin+tl_ac_num,0])/tl_ac_num
-zone_fire_rate[5,0] = np.sum(fire_rate[in_begin:in_begin+iin_num,0])/iin_num
-    
-print(np.linalg.solve((Z-T),b).transpose())
-print(zone_fire_rate.transpose())
