@@ -1237,7 +1237,7 @@ def main(load_from_file, configuration):
          
         if new_player_loc in goals:
             prev_sensory_input_vec = sensory_input_vec
-            sensory_input_vec = generate_state_from_simulator(world, cur_player, goals)
+            sensory_input_vec = generate_state_from_simulator(world, cur_player)
             sensory_input_vec *= model.conf['sensory_input_strength']
             if not quiet:
                 print('sensory input vec: ' + str((sensory_input_vec.transpose() > 0).astype(int)))
