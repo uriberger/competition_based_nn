@@ -1,11 +1,14 @@
 import numpy as np
-import math
 from copy import deepcopy
 
 ''' Experiment 1:
 - A single, excitatory input population
 
-Result: It's easy to predict average firing rate
+Result:
+1. With a simple refractory period, it's easy to predict average firing rate
+2. With a complex refractory period, we can easily predict average firing rate only in the case
+of low mean input. As we increase the mean input, the result/prediction ratio becomes smaller
+and smaller
 '''
 
 # General parameters
@@ -62,7 +65,6 @@ class ModelClass:
             self.synapse_strength = trained_strength[0]
             
         self.prev_act = np.zeros((unit_num, 1))
-        self.before_prev_act = np.zeros((unit_num, 1))
         self.prev_input_to_neurons = np.zeros((unit_num, 1))
         
         self.fix_synapse_strength()
@@ -123,7 +125,6 @@ class ModelClass:
         
         cur_act = self.excitatory_activation_function(cur_input)
         
-        self.before_prev_act = deepcopy(self.prev_act)
         self.prev_act = deepcopy(cur_act)
         self.prev_input_to_neurons = deepcopy(cur_input)
         

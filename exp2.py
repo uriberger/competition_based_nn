@@ -1,5 +1,4 @@
 import numpy as np
-import math
 from copy import deepcopy
 
 ''' Experiment 2:
@@ -143,7 +142,6 @@ class ModelClass:
         
         cur_act = self.excitatory_activation_function(cur_input)
         
-        self.before_prev_act = deepcopy(self.prev_act)
         self.prev_act = deepcopy(cur_act)
         self.prev_input_to_neurons = deepcopy(cur_input)
         
