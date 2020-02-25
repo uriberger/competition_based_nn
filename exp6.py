@@ -24,6 +24,10 @@ In previous cases a neuron that charges slower than the IIN would almost always 
 now we have more complex dynamics, with top-down input.
 '''
 
+# Confiugration
+RECURRENT_CONNECTIONS = False
+FEEDBACK_CONNECTIONS = True
+
 # General parameters
 input_num = 8
 ein_num = 8
@@ -47,8 +51,10 @@ class ModelClass:
         'Z_ex_ex_th_ratio' : 0.5,
         'Z_iin_ex_th_ratio' : 1,
         
-        'Z_inp_to_ein_Z_ex_ratio' : 0.5,
-        'Z_out_to_ein_Z_ex_ratio' : 0.5,
+        'Z_inp_to_ein_percentage' : 0.5,
+        'Z_out_to_ein_percentage' : 0.5,
+        
+        'Z_rec_Z_ex_ratio' : 0.5,
         }
     
     def __init__(self, configuration, load_from_file, quiet):
@@ -95,18 +101,32 @@ class ModelClass:
         iin_begin = output_begin + output_num
         self.zero_matrix = np.ones((unit_num,unit_num))
         
-        self.zero_matrix[input_begin:input_begin+input_num,input_begin:input_begin+input_num] = 0
+        if not RECURRENT_CONNECTIONS:
+            self.zero_matrix[input_begin:input_begin+input_num,input_begin:input_begin+input_num] = 0
+        if not FEEDBACK_CONNECTIONS:
+            self.zero_matrix[input_begin:input_begin+input_num,ein_begin:ein_begin+ein_num] = 0
         self.zero_matrix[input_begin:input_begin+input_num,output_begin:output_begin+output_num] = 0
-        self.zero_matrix[iin_begin,input_begin:input_begin+input_num] = 0
+        if not RECURRENT_CONNECTIONS:
+            self.zero_matrix[iin_begin,input_begin:input_begin+input_num] = 0
+        if not FEEDBACK_CONNECTIONS:
+            self.zero_matrix[iin_begin,ein_begin:ein_begin+ein_num] = 0
         self.zero_matrix[iin_begin,output_begin:output_begin+output_num] = 0
         
-        self.zero_matrix[ein_begin:ein_begin+ein_num,ein_begin:ein_begin+ein_num] = 0
-        self.zero_matrix[iin_begin+1,ein_begin:ein_begin+ein_num] = 0
+        if not RECURRENT_CONNECTIONS:
+            self.zero_matrix[ein_begin:ein_begin+ein_num,ein_begin:ein_begin+ein_num] = 0
+        if not FEEDBACK_CONNECTIONS:
+            self.zero_matrix[ein_begin:ein_begin+ein_num,output_begin:output_begin+output_num] = 0
+        if not RECURRENT_CONNECTIONS:
+            self.zero_matrix[iin_begin+1,ein_begin:ein_begin+ein_num] = 0
+        if not FEEDBACK_CONNECTIONS:
+            self.zero_matrix[iin_begin+1,output_begin:output_begin+output_num] = 0
         
         self.zero_matrix[output_begin:output_begin+output_num,input_begin:input_begin+input_num] = 0
-        self.zero_matrix[output_begin:output_begin+output_num,output_begin:output_begin+output_num] = 0
+        if not RECURRENT_CONNECTIONS:
+            self.zero_matrix[output_begin:output_begin+output_num,output_begin:output_begin+output_num] = 0
         self.zero_matrix[iin_begin+2,input_begin:input_begin+input_num] = 0
-        self.zero_matrix[iin_begin+2,output_begin:output_begin+output_num] = 0
+        if not RECURRENT_CONNECTIONS:
+            self.zero_matrix[iin_begin+2,output_begin:output_begin+output_num] = 0
         
         self.zero_matrix[ein_begin:ein_begin+ein_num,iin_begin] = 0
         self.zero_matrix[output_begin:output_begin+output_num,iin_begin] = 0
@@ -127,8 +147,17 @@ class ModelClass:
         self.conf['Z_ex'] = self.conf['Z_ex_ex_th_ratio'] * self.conf['excitatory_threshold']
         self.conf['Z_iin'] = self.conf['Z_iin_ex_th_ratio'] * self.conf['excitatory_threshold']
         
-        self.conf['Z_inp_to_ein'] = self.conf['Z_inp_to_ein_Z_ex_ratio'] * self.conf['Z_ex']
-        self.conf['Z_out_to_ein'] = self.conf['Z_out_to_ein_Z_ex_ratio'] * self.conf['Z_ex']
+        if RECURRENT_CONNECTIONS:
+            Z_other_to_ein = (1-self.conf['Z_rec_Z_ex_ratio']) * self.conf['Z_ex']
+        else:
+            Z_other_to_ein = self.conf['Z_ex']
+        if FEEDBACK_CONNECTIONS:
+            self.conf['Z_inp_to_ein'] = self.conf['Z_inp_to_ein_percentage'] * Z_other_to_ein
+            self.conf['Z_out_to_ein'] = self.conf['Z_out_to_ein_percentage'] * Z_other_to_ein
+        else:
+            self.conf['Z_inp_to_ein'] = Z_other_to_ein
+            
+        self.conf['Z_rec'] = self.conf['Z_rec_Z_ex_ratio'] * self.conf['Z_ex']
     
     def fix_synapse_strength(self):
         # Normalize the synapses strength, and enforce the invariants.
@@ -149,34 +178,75 @@ class ModelClass:
         output_begin = ein_begin + ein_num
         iin_begin = output_begin + output_num
         
-        input_to_input_row_sum = np.ones((input_num,input_num))
-        ein_to_input_row_sum = (self.synapse_strength[input_begin:input_begin+input_num,ein_begin:ein_begin+ein_num].sum(axis=1).reshape(input_num,1).repeat(ein_num, axis=1))/self.conf['Z_ex']
+        if RECURRENT_CONNECTIONS:
+            Z_non_rec = (1 - self.conf['Z_rec_Z_ex_ratio']) * self.conf['Z_ex']
+        else:
+            Z_non_rec = self.conf['Z_ex']
+        
+        # Input to input neurons
+        if RECURRENT_CONNECTIONS:
+            input_to_input_row_sum = (self.synapse_strength[input_begin:input_begin+input_num,input_begin:input_begin+input_num].sum(axis=1).reshape(input_num,1).repeat(input_num, axis=1))/self.conf['Z_rec']
+        else:
+            input_to_input_row_sum = np.ones((input_num,input_num))
+        if FEEDBACK_CONNECTIONS:
+            ein_to_input_row_sum = (self.synapse_strength[input_begin:input_begin+input_num,ein_begin:ein_begin+ein_num].sum(axis=1).reshape(input_num,1).repeat(ein_num, axis=1))/Z_non_rec
+        else:
+            ein_to_input_row_sum = np.ones((input_num,ein_num))
         output_to_input_row_sum = np.ones((input_num,output_num))
         input_row_sum = np.concatenate((input_to_input_row_sum,ein_to_input_row_sum,output_to_input_row_sum),axis=1)
         
+        # Input to EINs
         input_to_ein_row_sum = (self.synapse_strength[ein_begin:ein_begin+ein_num,input_begin:input_begin+input_num].sum(axis=1).reshape(ein_num,1).repeat(input_num, axis=1))/self.conf['Z_inp_to_ein']
-        ein_to_ein_row_sum = np.ones((ein_num,ein_num))
-        output_to_ein_row_sum = (self.synapse_strength[ein_begin:ein_begin+ein_num,output_begin:output_begin+output_num].sum(axis=1).reshape(ein_num,1).repeat(output_num, axis=1))/self.conf['Z_out_to_ein']
+        if RECURRENT_CONNECTIONS:
+            ein_to_ein_row_sum = (self.synapse_strength[ein_begin:ein_begin+ein_num,ein_begin:ein_begin+ein_num].sum(axis=1).reshape(ein_num,1).repeat(ein_num, axis=1))/self.conf['Z_rec']
+        else:
+            ein_to_ein_row_sum = np.ones((ein_num,ein_num))
+        if FEEDBACK_CONNECTIONS:
+            output_to_ein_row_sum = (self.synapse_strength[ein_begin:ein_begin+ein_num,output_begin:output_begin+output_num].sum(axis=1).reshape(ein_num,1).repeat(output_num, axis=1))/self.conf['Z_out_to_ein']
+        else:
+            output_to_ein_row_sum = np.ones((ein_num,output_num))
         ein_row_sum = np.concatenate((input_to_ein_row_sum,ein_to_ein_row_sum,output_to_ein_row_sum),axis=1)
         
+        # Input to output neurons
         input_to_output_row_sum = np.ones((output_num,input_num))
-        ein_to_output_row_sum = (self.synapse_strength[output_begin:output_begin+output_num,ein_begin:ein_begin+ein_num].sum(axis=1).reshape(output_num,1).repeat(ein_num, axis=1))/self.conf['Z_ex']
-        output_to_output_row_sum = np.ones((output_num,output_num))
+        ein_to_output_row_sum = (self.synapse_strength[output_begin:output_begin+output_num,ein_begin:ein_begin+ein_num].sum(axis=1).reshape(output_num,1).repeat(ein_num, axis=1))/Z_non_rec
+        if RECURRENT_CONNECTIONS:
+            output_to_output_row_sum = (self.synapse_strength[output_begin:output_begin+output_num,output_begin:output_begin+output_num].sum(axis=1).reshape(output_num,1).repeat(output_num, axis=1))/self.conf['Z_rec']
+        else:
+            output_to_output_row_sum = np.ones((output_num,output_num))
         output_row_sum = np.concatenate((input_to_output_row_sum,ein_to_output_row_sum,output_to_output_row_sum),axis=1)
-                
-        input_to_input_iin_row_sum = np.ones((1,input_num))
-        ein_to_input_iin_row_sum = (self.synapse_strength[iin_begin,ein_begin:ein_begin+ein_num].sum().repeat(ein_num).reshape(1,ein_num))/self.conf['Z_ex']
+        
+        # Input to input IIN
+        if RECURRENT_CONNECTIONS:
+            input_to_input_iin_row_sum = (self.synapse_strength[iin_begin,input_begin:input_begin+input_num].sum().repeat(input_num).reshape(1,input_num))/self.conf['Z_rec']
+        else:
+            input_to_input_iin_row_sum = np.ones((1,input_num))
+        if FEEDBACK_CONNECTIONS:
+            ein_to_input_iin_row_sum = (self.synapse_strength[iin_begin,ein_begin:ein_begin+ein_num].sum().repeat(ein_num).reshape(1,ein_num))/Z_non_rec
+        else:
+            ein_to_input_iin_row_sum = np.ones((1,ein_num))
         output_to_input_iin_row_sum = np.ones((1,output_num))
         input_iin_from_ex_row_sum = np.concatenate((input_to_input_iin_row_sum,ein_to_input_iin_row_sum,output_to_input_iin_row_sum),axis=1)
         
+        # Input to EIN's IIN
         input_to_ein_iin_row_sum = (self.synapse_strength[iin_begin+1,input_begin:input_begin+input_num].sum().repeat(input_num).reshape(1,input_num))/self.conf['Z_inp_to_ein']
-        ein_to_ein_iin_row_sum = np.ones((1,ein_num))
-        output_to_ein_iin_row_sum = (self.synapse_strength[iin_begin+1,output_begin:output_begin+output_num].sum().repeat(output_num).reshape(1,output_num))/self.conf['Z_out_to_ein']
+        if RECURRENT_CONNECTIONS:
+            ein_to_ein_iin_row_sum = (self.synapse_strength[iin_begin+1,ein_begin:ein_begin+ein_num].sum().repeat(ein_num).reshape(1,ein_num))/self.conf['Z_rec']
+        else:
+            ein_to_ein_iin_row_sum = np.ones((1,ein_num))
+        if FEEDBACK_CONNECTIONS:
+            output_to_ein_iin_row_sum = (self.synapse_strength[iin_begin+1,output_begin:output_begin+output_num].sum().repeat(output_num).reshape(1,output_num))/self.conf['Z_out_to_ein']
+        else:
+            output_to_ein_iin_row_sum = np.ones((1,output_num))
         ein_iin_from_ex_row_sum = np.concatenate((input_to_ein_iin_row_sum,ein_to_ein_iin_row_sum,output_to_ein_iin_row_sum),axis=1)
         
+        # Input to output IIN
         input_to_output_iin_row_sum = np.ones((1,input_num))
-        ein_to_output_iin_row_sum = (self.synapse_strength[iin_begin+2,ein_begin:ein_begin+ein_num].sum().repeat(ein_num).reshape(1,ein_num))/self.conf['Z_ex']
-        output_to_output_iin_row_sum = np.ones((1,output_num))
+        ein_to_output_iin_row_sum = (self.synapse_strength[iin_begin+2,ein_begin:ein_begin+ein_num].sum().repeat(ein_num).reshape(1,ein_num))/Z_non_rec
+        if RECURRENT_CONNECTIONS:
+            output_to_output_iin_row_sum = (self.synapse_strength[iin_begin+2,output_begin:output_begin+output_num].sum().repeat(output_num).reshape(1,output_num))/self.conf['Z_rec']
+        else:
+            output_to_output_iin_row_sum = np.ones((1,output_num))
         output_iin_from_ex_row_sum = np.concatenate((input_to_output_iin_row_sum,ein_to_output_iin_row_sum,output_to_output_iin_row_sum),axis=1)
         
         excitatory_row_sums = np.concatenate((input_row_sum,ein_row_sum,output_row_sum,input_iin_from_ex_row_sum,ein_iin_from_ex_row_sum,output_iin_from_ex_row_sum),axis=0)
@@ -252,3 +322,4 @@ input_vec = model.generate_random_external_input()
 
 fire_history = model.simulate_dynamics(input_vec)
 fire_count = [len(a) for a in fire_history]
+print('Fire count: ' + str(fire_count))
