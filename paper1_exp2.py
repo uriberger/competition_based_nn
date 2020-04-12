@@ -1,6 +1,7 @@
 import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
+import time
 
 ''' Paper 1, Experiment 2:
 The purpose of this experiment is a simple learning task- we want to show that the network can learn
@@ -14,7 +15,8 @@ class ModelClass:
         'excitatory_threshold' : 1,
         'inhibitory_threshold' : 1,
         'sensory_input_strength' : 1/3,
-        'layers_size' : [100,10],
+        'response_innervation_strength' : 0.1,
+        'layers_size' : [100,4],
         
         # Winner num
         'winner_num' : [9,1],
@@ -22,6 +24,10 @@ class ModelClass:
         # Normalization parameters
         'Z_iin_ex_th_ratio' : 1,
         'Z_intra_layer_ex_th_ratio' : 1,
+        'max_average_strength_ratio' : 2,
+        
+        # Learning parameters
+        'eta' : 0.01,
         }
     
     def __init__(self, configuration, load_from_file, quiet):
@@ -50,7 +56,7 @@ class ModelClass:
         excitatory_unit_num = sum(self.conf['layers_size'])
         
         if file_suffix == None:
-            self.synapse_strength = np.random.rand(unit_num, unit_num)
+            self.synapse_strength = np.ones((unit_num, unit_num))
             self.synapse_strength[:, excitatory_unit_num:] = (-1) * self.synapse_strength[:, excitatory_unit_num:]            
         else:
             file_name = "synapse_strength"
@@ -107,6 +113,15 @@ class ModelClass:
         np.fill_diagonal(self.zero_matrix,0)
         
         self.fix_synapse_strength()
+        
+        if file_suffix == None:
+            # Add some variance to the weights
+            noise_reduce_factor = 10
+            
+            for l in range(1,len(self.conf['layers_size'])):
+                self.synapse_strength[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l])] += np.random.normal(0,self.conf['Z_vals'][l-1]/(noise_reduce_factor*self.conf['layers_size'][l-1]),(self.conf['layers_size'][l],self.conf['layers_size'][l-1]))
+            
+            self.fix_synapse_strength()
             
     def init_normalization_parameters(self):
         # Initialize normalization parameters
@@ -175,7 +190,23 @@ class ModelClass:
         row_sums[row_sums == 0] = 1
         self.synapse_strength = self.synapse_strength/row_sums
         
-    def simulate_dynamics(self, input_vec):
+    def update_synapse_strength(self, cur_fire_count):
+        for l in range(1,len(self.conf['layers_size'])):
+            prev_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l-1])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l-1] else 0 for i in range(self.conf['layers_size'][l-1])]]).transpose()
+            cur_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l] else 0 for i in range(self.conf['layers_size'][l])]]).transpose()
+            update_mat = np.matmul(2*(cur_layer_winners-0.5),prev_layer_winners.transpose())
+            self.synapse_strength[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l])] += update_mat*self.conf['eta']*(self.conf['Z_vals'][l-1]/self.conf['layers_size'][l-1])
+        
+        self.fix_synapse_strength()
+        
+        # Make sure no excitatory weight is more than the maximal possible weight
+        for l in range(1,len(self.conf['layers_size'])):
+            max_val = self.conf['max_average_strength_ratio']*(self.conf['Z_vals'][l-1]/self.conf['layers_size'][l-1])
+            self.synapse_strength[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l])][self.synapse_strength[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l])] > max_val] = max_val
+        
+        self.fix_synapse_strength()
+        
+    def simulate_dynamics(self, input_vec, innervated_response_neuron):
         unit_num = sum(self.conf['layers_size']) + len(self.conf['layers_size'])
         
         fire_history = []
@@ -189,7 +220,7 @@ class ModelClass:
                 self.my_print('t='+str(t))
                 
             # Propagate external input
-            self.prop_external_input(input_vec)
+            self.prop_external_input(input_vec, innervated_response_neuron)
                 
             # Document fire history
             for unit_ind in range(unit_num):
@@ -210,7 +241,7 @@ class ModelClass:
         
         return fire_history
         
-    def prop_external_input(self, sensory_input_vec):
+    def prop_external_input(self, sensory_input_vec, innervated_response_neuron):
         unit_num = sum(self.conf['layers_size']) + len(self.conf['layers_size'])
         
         # Simulate the dynamics of the system for a single time step
@@ -219,6 +250,9 @@ class ModelClass:
         cur_input = np.add(cur_input, input_from_prev_layer)
         input_from_pre_layer = np.matmul(self.synapse_strength, self.prev_act)
         cur_input = np.add(cur_input, input_from_pre_layer)
+        
+        if innervated_response_neuron != -1:
+            cur_input[sum(self.conf['layers_size'][:-1])+innervated_response_neuron] = self.conf['response_innervation_strength']
         
         # Accumulating input
         cur_input = np.add(cur_input, self.prev_input_to_neurons)
@@ -325,149 +359,68 @@ def plot_inputs():
     plt.title('input4')
     plt.show()
 
-# Winner number
-def plot_winner_num_as_a_func_of_response_num():
-    response_nums = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40]
-    average_winner_nums = []
-    for _ in range(len(input_vecs)):
-        average_winner_nums.append([])
-    average_sensory_winner_nums = []
-    for _ in range(len(input_vecs)):
-        average_sensory_winner_nums.append([])
+def plot_precision_as_a_func_of_training_iter_num():
+    training_iter_num = 100
+    etas = [0.0001, 0.001, 0.01, 0.1]
     
-    iter_num = 1000
-    for response_num in response_nums:
-        print('Starting with ' + str(response_num) + ' response neurons')
-        winner_num_sums = [0]*len(input_vecs)
-        sensory_winner_num_sums = [0]*len(input_vecs)
-        for cur_iter in range(iter_num):
-            if cur_iter % 100 == 0:
-                print('\tIter ' + str(cur_iter))
-            for input_idx in range(len(input_vecs)):
-                model = ModelClass({'layers_size' : [100,response_num]},None,True)
-                fire_history = model.simulate_dynamics(input_vecs[input_idx])
-                fire_count = [len(a) for a in fire_history]
-                winner_num_sums[input_idx] += len([x for x in range(response_num) if fire_count[sum(model.conf['layers_size'][:-1])+x]>0])
-                sensory_winner_num_sums[input_idx] += len([x for x in range(model.conf['layers_size'][0]) if fire_count[x]>0])
-        for input_idx in range(len(input_vecs)):
-            average_winner_num = winner_num_sums[input_idx]/iter_num
-            print('Winner num average for input ' + str(input_idx) + ': ' + str(average_winner_num))
-            average_winner_nums[input_idx].append(average_winner_num)
-            average_sensory_winner_num = sensory_winner_num_sums[input_idx]/iter_num
-            print('Sensory winner num average for input ' + str(input_idx) + ': ' + str(average_sensory_winner_num))
-            average_sensory_winner_nums[input_idx].append(average_sensory_winner_num)
-    for input_idx in range(len(input_vecs)):
-        plt.plot(response_nums,average_winner_nums[input_idx],label='input '+str(input_idx+1))
+    experiment_iter_num = 100
+    for eta in etas:
+        print('Starting with eta=' + str(eta))
+        correct_sums = [0]*training_iter_num
+        for cur_experiment_iter in range(experiment_iter_num):
+            if cur_experiment_iter % 10 == 0:
+                print('\tIter ' + str(cur_experiment_iter))
+            model = ModelClass({'eta' : eta},None,True)
+            total_t1 = 0
+            total_t2 = 0
+            total_t3 = 0
+            total_t4 = 0
+            for cur_training_iter in range(training_iter_num):
+                # Training
+                cur_perm = np.random.permutation(len(input_vecs))
+                for i in range(len(input_vecs)):
+                    true_label = cur_perm[i]
+                    input_vec = input_vecs[cur_perm[i]]
+                    
+                    t1 = time.time()
+                    fire_history = model.simulate_dynamics(input_vec,true_label)
+                    total_t1 += time.time()-t1
+                    fire_count = [len(a) for a in fire_history]
+                    t2 = time.time()
+                    model.update_synapse_strength(fire_count)
+                    total_t2 += time.time()-t2
+                # Evaluating
+                correct_count = 0
+                for cur_label in range(len(input_vecs)):
+                    input_vec = input_vecs[cur_label]
+                    
+                    t3 = time.time()
+                    fire_history = model.simulate_dynamics(input_vec,-1)
+                    total_t3 += time.time()-t3
+                    fire_count = [len(a) for a in fire_history]
+                    
+                    t4 = time.time()
+                    correct = False
+                    if fire_count[sum(model.conf['layers_size'][:-1])+cur_label] > 0:
+                        correct = True
+                        for unit_ind in range(model.conf['layers_size'][-1]):
+                            if unit_ind == cur_label:
+                                continue
+                            if fire_count[sum(model.conf['layers_size'][:-1])+unit_ind] > 0:
+                                correct = False
+                                break
+                        if correct:
+                            correct_count += 1
+                    total_t4 += time.time()-t4
+                correct_sums[cur_training_iter] += correct_count
+            print(total_t1,total_t2,total_t3,total_t4)
+                    
+        precisions = [(x/experiment_iter_num)/len(input_vecs) for x in correct_sums]
+        plt.plot(range(training_iter_num), precisions, label='eta='+str(eta))
     plt.legend()
-    plt.xlabel('Number of response neurons')
-    plt.ylabel('Average number of winners')
+    plt.xlabel('Iteration number')
+    plt.ylabel('Average precision')
     plt.show()
     
-    for input_idx in range(len(input_vecs)):
-        plt.plot(response_nums,average_sensory_winner_nums[input_idx],label='input '+str(input_idx+1))
-    plt.legend()
-    plt.xlabel('Number of response neurons')
-    plt.ylabel('Average number of sensory winners')
-    plt.show()
-    
-def plot_winner_num_as_a_func_of_layer_num():
-    response_num = 10
-    
-    layer_nums = [2,3,4,5]
-    average_winner_nums = []
-    for _ in range(len(input_vecs)):
-        average_winner_nums.append([])
-    
-    iter_num = 1000
-    for layer_num in layer_nums:
-        print('Starting with ' + str(layer_num) + ' layers')
-        winner_num_sums = [0]*len(input_vecs)
-        for cur_iter in range(iter_num):
-            if cur_iter % 100 == 0:
-                print('\tIter ' + str(cur_iter))
-            for input_idx in range(len(input_vecs)):
-                layers_size = [100]+[response_num]*(layer_num-1)
-                winner_num = [9]+[1]*(layer_num-1)
-                model = ModelClass({'layers_size' : layers_size,'winner_num' : winner_num},None,True)
-                fire_history = model.simulate_dynamics(input_vecs[input_idx])
-                fire_count = [len(a) for a in fire_history]
-                winner_num_sums[input_idx] += len([x for x in range(response_num) if fire_count[sum(model.conf['layers_size'][:-1])+x]>0])
-        for input_idx in range(len(input_vecs)):
-            average_winner_num = winner_num_sums[input_idx]/iter_num
-            print('Winner num average for input ' + str(input_idx) + ': ' + str(average_winner_num))
-            average_winner_nums[input_idx].append(average_winner_num)
-    for input_idx in range(len(input_vecs)):
-        plt.plot(layer_nums,average_winner_nums[input_idx],label='input '+str(input_idx+1))
-    plt.legend()
-    plt.xlabel('Number of layers')
-    plt.ylabel('Average number of winners')
-    plt.show()
-    
-def plot_winner_num_as_a_func_of_prev_layer_winner_num():
-    response_num = 10
-    
-    prev_layer_winner_nums = [1,2,3,4,5,6,7,8,9,10]
-    average_winner_nums = []
-    for _ in range(len(input_vecs)):
-        average_winner_nums.append([])
-    
-    iter_num = 1000
-    for prev_layer_winner_num in prev_layer_winner_nums:
-        print('Starting with ' + str(prev_layer_winner_num) + ' winners')
-        winner_num_sums = [0]*len(input_vecs)
-        for cur_iter in range(iter_num):
-            if cur_iter % 100 == 0:
-                print('\tIter ' + str(cur_iter))
-            for input_idx in range(len(input_vecs)):
-                layers_size = [100,response_num,response_num]
-                winner_num = [9,prev_layer_winner_num,1]
-                model = ModelClass({'layers_size' : layers_size,'winner_num' : winner_num},None,True)
-                fire_history = model.simulate_dynamics(input_vecs[input_idx])
-                fire_count = [len(a) for a in fire_history]
-                winner_num_sums[input_idx] += len([x for x in range(response_num) if fire_count[sum(model.conf['layers_size'][:-1])+x]>0])
-        for input_idx in range(len(input_vecs)):
-            average_winner_num = winner_num_sums[input_idx]/iter_num
-            print('Winner num average for input ' + str(input_idx) + ': ' + str(average_winner_num))
-            average_winner_nums[input_idx].append(average_winner_num)
-    for input_idx in range(len(input_vecs)):
-        plt.plot(prev_layer_winner_nums,average_winner_nums[input_idx],label='input '+str(input_idx+1))
-    plt.legend()
-    plt.xlabel('Number of winners in previous layer')
-    plt.ylabel('Number of winners in response layer')
-    plt.show()
-    
-# Winner intersection
-def plot_winner_intersection_as_a_func_of_response_num():
-    response_nums = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40]
-    average_ratios = []
-    
-    iter_num = 1000
-    for response_num in response_nums:
-        print('Starting with ' + str(response_num) + ' response neurons winners')
-        ratio_sum = 0
-        for cur_iter in range(iter_num):
-            if cur_iter % 100 == 0:
-                print('\tIter ' + str(cur_iter))
-            winner_list = []
-            for input_idx in range(len(input_vecs)):
-                layers_size = [100,response_num]
-                model = ModelClass({'layers_size' : layers_size},None,True)
-                fire_history = model.simulate_dynamics(input_vecs[input_idx])
-                fire_count = [len(a) for a in fire_history]
-                winner_list += [x for x in range(response_num) if fire_count[sum(model.conf['layers_size'][:-1])+x]>0]
-            union_size = len(winner_list)
-            unique_winners_num = len(list(set(winner_list)))
-            ratio_sum += unique_winners_num/union_size
-        average_ratio = ratio_sum/iter_num
-        print('Winner ratio: ' + str(average_ratio))
-        average_ratios.append(average_ratio)
-    plt.plot(response_nums,average_ratios)
-    plt.xlabel('Number of response neurons')
-    plt.ylabel('Average unique-total winner num ratio')
-    plt.show()
-        
 #plot_inputs()
-#plot_winner_num_as_a_func_of_response_num()
-#plot_winner_num_as_a_func_of_layer_num()
-#plot_winner_num_as_a_func_of_prev_layer_winner_num()
-plot_winner_intersection_as_a_func_of_response_num()
+plot_precision_as_a_func_of_training_iter_num()
