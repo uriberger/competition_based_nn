@@ -1,7 +1,6 @@
 import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
-import time
 
 ''' Paper 1, Experiment 2:
 The purpose of this experiment is a simple learning task- we want to show that the network can learn
@@ -15,7 +14,7 @@ class ModelClass:
         'excitatory_threshold' : 1,
         'inhibitory_threshold' : 1,
         'sensory_input_strength' : 1/3,
-        'response_innervation_strength' : 0.1,
+        'response_innervation_strength' : 0.01,
         'layers_size' : [100,4],
         
         # Winner num
@@ -212,6 +211,10 @@ class ModelClass:
         fire_history = []
         for _ in range(unit_num):
             fire_history.append([])
+            
+        sensory_input_vec = np.pad(input_vec, ((0,unit_num-self.conf['layers_size'][0]),(0,0)), 'constant')
+        if innervated_response_neuron != -1:
+            sensory_input_vec[sum(self.conf['layers_size'][:-1])+innervated_response_neuron] = self.conf['response_innervation_strength']
         
         #for t in range(T):
         t = 0
@@ -220,7 +223,7 @@ class ModelClass:
                 self.my_print('t='+str(t))
                 
             # Propagate external input
-            self.prop_external_input(input_vec, innervated_response_neuron)
+            self.prop_external_input(sensory_input_vec)
                 
             # Document fire history
             for unit_ind in range(unit_num):
@@ -241,18 +244,11 @@ class ModelClass:
         
         return fire_history
         
-    def prop_external_input(self, sensory_input_vec, innervated_response_neuron):
-        unit_num = sum(self.conf['layers_size']) + len(self.conf['layers_size'])
-        
+    def prop_external_input(self, sensory_input_vec):
         # Simulate the dynamics of the system for a single time step
-        cur_input = np.zeros((unit_num, 1))
-        input_from_prev_layer = np.pad(sensory_input_vec, ((0,unit_num-self.conf['layers_size'][0]),(0,0)), 'constant')
-        cur_input = np.add(cur_input, input_from_prev_layer)
-        input_from_pre_layer = np.matmul(self.synapse_strength, self.prev_act)
-        cur_input = np.add(cur_input, input_from_pre_layer)
-        
-        if innervated_response_neuron != -1:
-            cur_input[sum(self.conf['layers_size'][:-1])+innervated_response_neuron] = self.conf['response_innervation_strength']
+        external_input = sensory_input_vec
+        internal_input = np.matmul(self.synapse_strength, self.prev_act)
+        cur_input = np.add(external_input, internal_input)
         
         # Accumulating input
         cur_input = np.add(cur_input, self.prev_input_to_neurons)
@@ -359,47 +355,36 @@ def plot_inputs():
     plt.title('input4')
     plt.show()
 
-def plot_precision_as_a_func_of_training_iter_num():
-    training_iter_num = 100
+def plot_precision_as_a_func_of_training_epoch_num():
+    training_epoch_num = 100
     etas = [0.0001, 0.001, 0.01, 0.1]
     
     experiment_iter_num = 100
     for eta in etas:
         print('Starting with eta=' + str(eta))
-        correct_sums = [0]*training_iter_num
+        correct_sums = [0]*training_epoch_num
         for cur_experiment_iter in range(experiment_iter_num):
             if cur_experiment_iter % 10 == 0:
                 print('\tIter ' + str(cur_experiment_iter))
             model = ModelClass({'eta' : eta},None,True)
-            total_t1 = 0
-            total_t2 = 0
-            total_t3 = 0
-            total_t4 = 0
-            for cur_training_iter in range(training_iter_num):
+            for cur_training_epoch in range(training_epoch_num):
                 # Training
                 cur_perm = np.random.permutation(len(input_vecs))
                 for i in range(len(input_vecs)):
                     true_label = cur_perm[i]
                     input_vec = input_vecs[cur_perm[i]]
                     
-                    t1 = time.time()
                     fire_history = model.simulate_dynamics(input_vec,true_label)
-                    total_t1 += time.time()-t1
                     fire_count = [len(a) for a in fire_history]
-                    t2 = time.time()
                     model.update_synapse_strength(fire_count)
-                    total_t2 += time.time()-t2
                 # Evaluating
                 correct_count = 0
                 for cur_label in range(len(input_vecs)):
                     input_vec = input_vecs[cur_label]
                     
-                    t3 = time.time()
                     fire_history = model.simulate_dynamics(input_vec,-1)
-                    total_t3 += time.time()-t3
                     fire_count = [len(a) for a in fire_history]
                     
-                    t4 = time.time()
                     correct = False
                     if fire_count[sum(model.conf['layers_size'][:-1])+cur_label] > 0:
                         correct = True
@@ -411,16 +396,14 @@ def plot_precision_as_a_func_of_training_iter_num():
                                 break
                         if correct:
                             correct_count += 1
-                    total_t4 += time.time()-t4
-                correct_sums[cur_training_iter] += correct_count
-            print(total_t1,total_t2,total_t3,total_t4)
+                correct_sums[cur_training_epoch] += correct_count
                     
         precisions = [(x/experiment_iter_num)/len(input_vecs) for x in correct_sums]
-        plt.plot(range(training_iter_num), precisions, label='eta='+str(eta))
+        plt.plot(range(training_epoch_num), precisions, label='eta='+str(eta))
     plt.legend()
-    plt.xlabel('Iteration number')
+    plt.xlabel('Epoch number')
     plt.ylabel('Average precision')
     plt.show()
     
 #plot_inputs()
-plot_precision_as_a_func_of_training_iter_num()
+plot_precision_as_a_func_of_training_epoch_num()
