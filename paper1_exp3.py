@@ -1,6 +1,7 @@
 import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
+import time
 
 ''' Paper 1, Experiment 3:
 The purpose of this experiment is to show that the network can learn to identifty objects no matter
@@ -18,15 +19,15 @@ class ModelClass:
         'layers_size' : [100,512,4],
         
         # Winner num
-        'winner_num' : [12,2,1],
+        'winner_num' : [13,1,1],
         
         # Normalization parameters
         'Z_iin_ex_th_ratio' : 1,
         'Z_intra_layer_ex_th_ratio' : 1,
-        'max_average_strength_ratio' : 1.1,
+        'max_average_strength_ratio' : 2,
         
         # Learning parameters
-        'eta' : 0.001,
+        'eta' : 0.01,
         }
     
     def __init__(self, configuration, load_from_file, quiet):
@@ -129,7 +130,10 @@ class ModelClass:
 
         self.conf['Z_vals'] = []
         for l in range(1,len(self.conf['layers_size'])):
-            self.conf['Z_vals'].append((self.conf['excitatory_threshold'] * self.conf['layers_size'][l-1])/(10*self.conf['winner_num'][l-1]))
+            norm_shrink_factor = 600
+            if l == len(self.conf['layers_size'])-1:
+                norm_shrink_factor = 10
+            self.conf['Z_vals'].append((self.conf['excitatory_threshold'] * self.conf['layers_size'][l-1])/(norm_shrink_factor*self.conf['winner_num'][l-1]))
         
         self.conf['Z_ex_to_iins'] = []
         for l in range(len(self.conf['layers_size'])):
@@ -194,6 +198,8 @@ class ModelClass:
             prev_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l-1])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l-1] else 0 for i in range(self.conf['layers_size'][l-1])]]).transpose()
             cur_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l] else 0 for i in range(self.conf['layers_size'][l])]]).transpose()
             update_mat = np.matmul(2*(cur_layer_winners-0.5),prev_layer_winners.transpose())
+            #update_factors = get_update_factor(self.synapse_strength[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l])])
+            #self.synapse_strength[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l])] += np.multiply(update_factors, update_mat*self.conf['eta']*(self.conf['Z_vals'][l-1]/self.conf['layers_size'][l-1]))
             self.synapse_strength[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l])] += update_mat*self.conf['eta']*(self.conf['Z_vals'][l-1]/self.conf['layers_size'][l-1])
         
         self.fix_synapse_strength()
@@ -273,47 +279,57 @@ class ModelClass:
     def inhibitory_activation_function(self, x):
         # Linear activation function for inhibitory neurons
         return 0 + (x >= self.conf['inhibitory_threshold'])
+    
+def entropy(weight_mat):
+    WM_rescaled = weight_mat/np.sum(weight_mat,axis=0)
+    WM_rescaled_without_zeros = deepcopy(WM_rescaled)
+    WM_rescaled_without_zeros[WM_rescaled_without_zeros == 0] = 1
+    return np.sum(np.multiply(WM_rescaled,np.log2(1/WM_rescaled_without_zeros)),axis=0)
+
+def get_update_factor(weight_mat):
+    scaled_entropy = np.power(2,entropy(weight_mat))/weight_mat.shape[0]
+    return scaled_entropy
                 
 model = ModelClass({},None,True)
 
 input_mat1 = np.array([
-    [1,1,1,0,],
-    [0,0,0,1,],
-    [0,0,1,0,],
-    [0,1,0,0,],
-    [0,0,1,0,],
-    [0,0,0,1,],
-    [1,1,1,0,],
+    [1,0,0,0,0,0,1,],
+    [0,1,0,0,0,1,0,],
+    [0,0,1,0,1,0,0,],
+    [0,0,0,1,0,0,0,],
+    [0,0,1,0,1,0,0,],
+    [0,1,0,0,0,1,0,],
+    [1,0,0,0,0,0,1,],
     ])
     
 input_mat2 = np.array([
-    [1,0,0,1,],
-    [1,0,0,1,],
-    [1,0,0,1,],
-    [0,1,1,1,],
-    [0,0,0,1,],
-    [0,0,0,1,],
-    [0,0,0,1,],
+    [0,0,0,1,0,0,0],
+    [0,0,1,0,1,0,0],
+    [0,1,0,0,0,1,0],
+    [1,0,0,0,0,0,1],
+    [0,1,0,0,0,1,0],
+    [0,0,1,0,1,0,0],
+    [0,0,0,1,0,0,0],
     ])
     
 input_mat3 = np.array([
-    [0,1,1,0,],
-    [1,0,0,1,],
-    [1,0,0,0,],
-    [1,1,1,0,],
-    [1,0,0,1,],
-    [1,0,0,1,],
-    [0,1,1,0,],
+    [0,0,0,1,0,0,0],
+    [0,0,0,1,0,0,0],
+    [0,0,0,1,0,0,0],
+    [1,1,1,1,1,1,1],
+    [0,0,0,1,0,0,0],
+    [0,0,0,1,0,0,0],
+    [0,0,0,1,0,0,0],
     ])
     
 input_mat4 = np.array([
-    [0,1,1,0,],
-    [1,0,0,1,],
-    [0,0,0,1,],
-    [0,0,1,0,],
-    [0,1,0,0,],
-    [1,0,0,0,],
-    [1,1,1,1,],
+    [1,1,1,1,1,1,1],
+    [0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0],
+    [1,1,1,1,1,1,1],
     ])
 
 input_mats = [input_mat1,input_mat2,input_mat3,input_mat4]
@@ -323,8 +339,8 @@ input_height, input_width = input_mat1.shape
 hori_location_num = N-input_width+1
 verti_location_num = N-input_height+1
 input_vecs = []
-#for start_ind in range(hori_location_num*verti_location_num):
-for start_ind in range(1):
+for start_ind in range(hori_location_num*verti_location_num):
+#for start_ind in range(2):
     start_point_hori_location = start_ind % hori_location_num
     start_point_verti_location = int(start_ind / hori_location_num)
     after_end_hori_pad = N-start_point_hori_location-input_width
@@ -359,33 +375,56 @@ def plot_inputs():
     plt.show()
 
 def plot_precision_as_a_func_of_training_epoch_num():
-    training_epoch_num = 100
+    training_epoch_num = 30
     
     experiment_iter_num = 1
     correct_sums = [0]*training_epoch_num
+    
     for cur_experiment_iter in range(experiment_iter_num):
-        if cur_experiment_iter % 10 == 0:
-            print('\tIter ' + str(cur_experiment_iter))
+        log_print('\tIter ' + str(cur_experiment_iter))
         model = ModelClass({},None,True)
+        cur_time = time.time()
+        correct_count = 0
         for cur_training_epoch in range(training_epoch_num):
-            print('\t\tEpoch ' + str(cur_training_epoch))
+            prev_epoch_time = time.time()-cur_time
+            cur_time = time.time()
+            log_print('\t\tEpoch ' + str(cur_training_epoch) + ', prev epoch took ' + str(prev_epoch_time) + ', prev epoch correct count ' + str(correct_count))
             # Training
             cur_perm = np.random.permutation(len(input_vecs))
+            ein_winners = [[],[],[],[]]
+            all_ein_indices = []
             for i in range(len(input_vecs)):
-                true_label = cur_perm[i]%4
+                log_print('\t\t\tTraining input ' + str(cur_perm[i]))
+                true_label = cur_perm[i]%len(input_mats)
                 input_vec = input_vecs[cur_perm[i]]
                 
                 fire_history = model.simulate_dynamics(input_vec,true_label)
                 fire_count = [len(a) for a in fire_history]
                 model.update_synapse_strength(fire_count)
+                ein_winners[true_label] += [i for i in range(512) if fire_count[i+100]>=0.5*fire_count[-2]]
+                ein_indices = [i for i in range(512) if fire_count[i+100]>0]
+                ein_firing = {x:fire_count[100+x] for x in ein_indices}
+                log_print('\t\t\tein firing: ' + str(ein_firing))
+                if len([x for x in ein_indices if x in all_ein_indices]) > 0:
+                    del_me = 0
+                    del_me += 1
+                all_ein_indices += ein_indices
+            all_ein_winners = list(set(ein_winners[0]))+list(set(ein_winners[1]))+list(set(ein_winners[2]))+list(set(ein_winners[3]))
+            union_size = len(all_ein_winners)
+            unique_winners_num = len(list(set(all_ein_winners)))
+            log_print('\t\tTotal of ' + str(union_size) + ' winners, of which ' + str(unique_winners_num) + ' are unique')
             # Evaluating
             correct_count = 0
             for input_ind in range(len(input_vecs)):
-                cur_label = input_ind % 4
-                input_vec = input_vecs[cur_label]
+                log_print('\t\t\tEvaluating input ' + str(input_ind) + ' of ' + str(len(input_vecs)))
+                cur_label = input_ind % len(input_mats)
+                input_vec = input_vecs[input_ind]
                 
                 fire_history = model.simulate_dynamics(input_vec,-1)
                 fire_count = [len(a) for a in fire_history]
+                ein_indices = [i for i in range(512) if fire_count[i+100]>0]
+                ein_firing = {x:fire_count[100+x] for x in ein_indices}
+                log_print('\t\t\tein firing: ' + str(ein_firing))
                 
                 correct = False
                 if fire_count[sum(model.conf['layers_size'][:-1])+cur_label] > 0:
@@ -401,10 +440,22 @@ def plot_precision_as_a_func_of_training_epoch_num():
             correct_sums[cur_training_epoch] += correct_count
                 
     precisions = [(x/experiment_iter_num)/len(input_vecs) for x in correct_sums]
-    plt.plot(range(training_epoch_num), precisions)
+    '''plt.plot(range(training_epoch_num), precisions)
     plt.xlabel('Epoch number')
     plt.ylabel('Average precision')
-    plt.show()
+    plt.show()'''
+    log_print(str(precisions))
+
+def log_print(my_str):
+    if write_to_log:
+        log_fp.write(my_str+ '\n')
+        log_fp.flush()
+    else:
+        print(my_str)
+        
+write_to_log = False
+if write_to_log:
+    log_fp = open('log.txt','w')
     
 #plot_inputs()
 plot_precision_as_a_func_of_training_epoch_num()
