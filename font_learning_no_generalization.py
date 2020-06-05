@@ -13,8 +13,10 @@ class ModelClass:
         #'sensory_input_strength' : 1/100,
         'sensory_input_strength' : 1/10,
         'response_innervation_strength' : 0.01,
-        'layers_size' : [99,4096,61],
-        'norm_shrink_factor' : 600,
+        'layers_size' : [99,2048,61],
+        #'norm_shrink_factor' : 600,
+        # CHANGE
+        'norm_shrink_factor' : 2400,
         
         # Normalization parameters
         'Z_iin_ex_th_ratio' : [0.01,1,1],
@@ -203,6 +205,8 @@ class ModelClass:
             prev_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l-1])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l-1] else 0 for i in range(self.conf['layers_size'][l-1])]]).transpose()
             cur_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l] else 0 for i in range(self.conf['layers_size'][l])]]).transpose()
             update_mat = np.matmul(2*(cur_layer_winners-0.5),prev_layer_winners.transpose())
+            # CHANGE
+            #update_mat = np.matmul((2*cur_layer_winners)-1.2,prev_layer_winners.transpose())
             self.synapse_strength[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l])] += update_mat*self.conf['eta']*(self.conf['Z_vals'][l-1]/self.conf['layers_size'][l-1])
         
         self.fix_synapse_strength()
@@ -275,8 +279,24 @@ class ModelClass:
         # Linear activation function for inhibitory neurons
         return 0 + (x >= self.conf['inhibitory_threshold'])
 
+def preprocess_training_set(tr_set):
+    M = 5
+    res = []
+    for cur_pattern in tr_set:
+        non_zero_num = len([x for x in range(cur_pattern.shape[0]) if cur_pattern[x,0] > 0])
+        val = M / non_zero_num
+        new_pattern = np.zeros(cur_pattern.shape)
+        for i in range(cur_pattern.shape[0]):
+            if cur_pattern[i,0] > 0:
+                new_pattern[i, 0] = val
+        res.append(new_pattern)
+    return res
+
 N = round(ModelClass.default_configuration['layers_size'][0]**0.5)
 training_set = generate_training_set_no_generalization(ModelClass.default_configuration['sensory_input_strength'])
+# CHANGE
+training_set = training_set[:61]
+#training_set = preprocess_training_set(training_set)
 test_set = training_set
 
 def plot_precision_as_a_func_of_training_epoch_num():
@@ -305,18 +325,20 @@ def plot_precision_as_a_func_of_training_epoch_num():
         # Evaluating
         log_print('\t\tEvaluating...')
         correct_count = 0
-        for input_ind in range(len(test_set)):
-            #log_print('\t\t\tEvaluating input ' + str(input_ind) + ' of ' + str(len(test_set)))
-            cur_label = input_ind % len(training_set)
-            input_vec = test_set[input_ind]
-            
-            fire_history = model.simulate_dynamics(input_vec,-1)
-            fire_count = [len(a) for a in fire_history]
-            
-            correct = len([x for x in fire_count[sum(model.conf['layers_size'][:-1]):sum(model.conf['layers_size'])] if x > 0]) == 1 and \
-                fire_count[sum(model.conf['layers_size'][:-1])+cur_label] > 0
-            if correct:
-                correct_count += 1
+        if cur_training_epoch > 40:
+            #model.save_synapse_strength('epoch' + str(cur_training_epoch))
+            for input_ind in range(len(test_set)):
+                #log_print('\t\t\tEvaluating input ' + str(input_ind) + ' of ' + str(len(test_set)))
+                cur_label = input_ind % len(training_set)
+                input_vec = test_set[input_ind]
+                
+                fire_history = model.simulate_dynamics(input_vec,-1)
+                fire_count = [len(a) for a in fire_history]
+                
+                correct = len([x for x in fire_count[sum(model.conf['layers_size'][:-1]):sum(model.conf['layers_size'])] if x > 0]) == 1 and \
+                    fire_count[sum(model.conf['layers_size'][:-1])+cur_label] > 0
+                if correct:
+                    correct_count += 1
                     
         log_print('\tCurrent correct count ' + str(correct_count))
         correct_counts.append(correct_count)
@@ -330,7 +352,7 @@ def log_print(my_str):
     else:
         print(my_str)
         
-write_to_log = True
+write_to_log = False
 if write_to_log:
     log_fp = open('log.txt','w')
     
