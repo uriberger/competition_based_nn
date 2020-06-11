@@ -54,12 +54,27 @@ class ModelClass:
         loaded. '''
         
         unit_num = sum(self.conf['layers_size']) + len(self.conf['layers_size'])
-        excitatory_unit_num = sum(self.conf['layers_size'])
         
         if file_suffix == None:
-            #self.synapse_strength = np.ones((unit_num, unit_num))
-            self.synapse_strength = np.random.rand(unit_num, unit_num)
-            self.synapse_strength[:, excitatory_unit_num:] = (-1) * self.synapse_strength[:, excitatory_unit_num:]            
+            self.synapse_strength = []
+            
+            # Synapses into 1st layer
+            self.synapse_strength.append([])
+            self.synapse_strength[0].append(np.random.rand(self.conf['layers_size'][0], self.conf['layers_size'][0]))
+            for _ in range(1,len(self.conf['layers_size'])):
+                self.synapse_strength[0].append(None)
+                self.synapse_strength[0].append(None)
+            
+            # Synapses into other layers
+            for l in range(1,len(self.conf['layers_size'])):
+                self.synapse_strength.append([])
+                for _ in range(l-1):
+                    self.synapse_strength[l].append(None)
+                self.synapse_strength[l].append(np.random.rand(self.conf['layers_size'][l], self.conf['layers_size'][l-1]))
+                for _ in range(l,len(self.conf['layers_size'])):
+                    self.synapse_strength[l].append(None)
+            '''self.synapse_strength = np.random.rand(unit_num, unit_num)
+            self.synapse_strength[:, excitatory_unit_num:] = (-1) * self.synapse_strength[:, excitatory_unit_num:]'''            
         else:
             file_name = "synapse_strength"
             file_name += "_" + file_suffix
@@ -72,12 +87,11 @@ class ModelClass:
         self.prev_act = np.zeros((unit_num, 1))
         self.prev_input_to_neurons = np.zeros((unit_num, 1))
         
-        self.zero_matrix = np.ones((unit_num,unit_num))
+        self.zero_matrix = np.zeros((self.conf['layers_size'][0],self.conf['layers_size'][0]))
         
         # Input to 1st layer
         '''Consider the N^2 input neurons as an NXN grid. Each neuron is connected only to its
         nearest neighbors. '''
-        self.zero_matrix[:self.conf['layers_size'][0],:self.conf['layers_size'][0]] = 0
         N = round(self.conf['layers_size'][0]**0.5)
         for unit_ind in range(self.conf['layers_size'][0]):
             if unit_ind % N > 0:
@@ -88,31 +102,6 @@ class ModelClass:
                 self.zero_matrix[unit_ind,unit_ind-N] = 1
             if unit_ind < self.conf['layers_size'][0]-N:
                 self.zero_matrix[unit_ind,unit_ind+N] = 1
-        self.zero_matrix[:self.conf['layers_size'][0],self.conf['layers_size'][0]:sum(self.conf['layers_size'])] = 0
-        
-        # Input to 1st IIN
-        self.zero_matrix[sum(self.conf['layers_size']),self.conf['layers_size'][0]:sum(self.conf['layers_size'])] = 0
-        
-        # Input from 1st IIN
-        self.zero_matrix[self.conf['layers_size'][0]:,sum(self.conf['layers_size'])] = 0
-        
-        # Input to other layers
-        for l in range(1,len(self.conf['layers_size'])):
-            # Input to excitatory neurons
-            self.zero_matrix[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),:sum(self.conf['layers_size'][:l-1])] = 0
-            self.zero_matrix[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'])] = 0
-            
-            # Input to IIN
-            self.zero_matrix[sum(self.conf['layers_size'])+l,:sum(self.conf['layers_size'][:l])] = 0
-            self.zero_matrix[sum(self.conf['layers_size'])+l,sum(self.conf['layers_size'][:l+1]):sum(self.conf['layers_size'])] = 0
-            
-            # Input from IIN
-            self.zero_matrix[:sum(self.conf['layers_size'][:l]),sum(self.conf['layers_size'])+l] = 0
-            self.zero_matrix[sum(self.conf['layers_size'][:l+1]):sum(self.conf['layers_size']),sum(self.conf['layers_size'])+l] = 0
-            self.zero_matrix[sum(self.conf['layers_size']):,sum(self.conf['layers_size'])+l] = 0
-        
-        # Don't allow self loops
-        np.fill_diagonal(self.zero_matrix,0)
         
         self.fix_synapse_strength()
             
@@ -132,7 +121,7 @@ class ModelClass:
         self.conf['Z_iin'] = [x * self.conf['excitatory_threshold'] for x in self.conf['Z_iin_ex_th_ratio']]
         self.conf['Z_intra_layer'] = self.conf['Z_intra_layer_ex_th_ratio'] * self.conf['excitatory_threshold']
 
-        self.conf['Z_vals'] = []
+        self.conf['Z_vals'] = [self.conf['Z_intra_layer']]
         first = True
         for l in range(1,len(self.conf['layers_size'])):
             if first:
@@ -152,67 +141,32 @@ class ModelClass:
     
     def fix_synapse_strength(self):
         # Normalize the synapses strength, and enforce the invariants.
-        excitatory_unit_num = sum(self.conf['layers_size'])
-        
-        # For symmetry, make sure IINs receive equal input from all neurons
-        self.synapse_strength[excitatory_unit_num:,:excitatory_unit_num] = 1
-        
-        # Also make sure intra-layer connections for input neurons are all of equal strength
-        self.synapse_strength[:self.conf['layers_size'][0],:self.conf['layers_size'][0]] = 1
-        self.synapse_strength[self.conf['layers_size'][0]:sum(self.conf['layers_size'][:1]),self.conf['layers_size'][0]:sum(self.conf['layers_size'][:1])] = 1
-        
+
+        # Make sure intra-layer connections for input neurons are all of equal strength
+        self.synapse_strength[0][0][:,:] = 1
+
         # Enforce invariants
-        self.synapse_strength = np.multiply(self.synapse_strength,self.zero_matrix)
+        self.synapse_strength[0][0] = np.multiply(self.synapse_strength[0][0],self.zero_matrix)
         
-        # Make sure excitatory weights are all excitatory
-        self.synapse_strength[:,:excitatory_unit_num][self.synapse_strength[:,:excitatory_unit_num] < 0] = 0
+        for post_l in range(0,len(self.conf['layers_size'])):
+            for pre_l in range(0,len(self.conf['layers_size'])):
+                if self.synapse_strength[post_l][pre_l] is None:
+                    continue
+                
+                # Make sure excitatory weights are all excitatory
+                self.synapse_strength[post_l][pre_l][self.synapse_strength[post_l][pre_l] < 0] = 0
         
-        # Normalize incoming excitatory weights to each unit    
-        
-        # Input to 1st layer
-        first_input_to_first_input_row_sum = (self.synapse_strength[:self.conf['layers_size'][0],:self.conf['layers_size'][0]].sum(axis=1).reshape(self.conf['layers_size'][0],1).repeat(self.conf['layers_size'][0], axis=1))/self.conf['Z_intra_layer']
-        rest_to_first_input_row_sum = np.ones((self.conf['layers_size'][0],sum(self.conf['layers_size'])-self.conf['layers_size'][0]))
-        first_input_row_sum = np.concatenate((first_input_to_first_input_row_sum,rest_to_first_input_row_sum),axis=1)
-        
-        excitatory_row_sums = first_input_row_sum
-        
-        for l in range(1,len(self.conf['layers_size'])):
-            # Input to EINs
-            input_from_earlier_layers = np.ones((self.conf['layers_size'][l],sum(self.conf['layers_size'][:l-1])))
-            input_from_prev_layer = (self.synapse_strength[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l])].sum(axis=1).reshape(self.conf['layers_size'][l],1).repeat(self.conf['layers_size'][l-1], axis=1))/self.conf['Z_vals'][l-1]
-            input_from_later_layers = np.ones((self.conf['layers_size'][l],sum(self.conf['layers_size'][l:])))
-            row_sum = np.concatenate((input_from_earlier_layers,input_from_prev_layer,input_from_later_layers),axis=1)
-            excitatory_row_sums = np.concatenate((excitatory_row_sums,row_sum),axis=0)
-        
-        # Input to IINs
-        for l in range(len(self.conf['layers_size'])):
-            input_from_earlier_layers = np.ones((1,sum(self.conf['layers_size'][:l])))
-            input_from_layer = (self.synapse_strength[sum(self.conf['layers_size'])+l,sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1])].sum().repeat(self.conf['layers_size'][l]).reshape(1,self.conf['layers_size'][l]))/self.conf['Z_ex_to_iins'][l]
-            input_from_later_layers = np.ones((1,sum(self.conf['layers_size'][l+1:])))
-            row_sum = np.concatenate((input_from_earlier_layers,input_from_layer,input_from_later_layers),axis=1)
-            excitatory_row_sums = np.concatenate((excitatory_row_sums,row_sum),axis=0)
-        
-        # Make sure inhibitory weights are all inhibitory
-        self.synapse_strength[:,excitatory_unit_num:][self.synapse_strength[:,excitatory_unit_num:] > 0] = 0
-        # Normalize incoming inhibitory weights to each unit
-        unit_num = excitatory_unit_num+len(self.conf['layers_size'])
-        inhibitory_row_sums = np.zeros((unit_num,0))
-        for l in range(len(self.conf['layers_size'])):
-            cur_layer_inhibitory_row_sums = (-1)*((self.synapse_strength[:,[excitatory_unit_num+l]].sum(axis=1).reshape(unit_num,1))/self.conf['Z_iin'][l])
-            inhibitory_row_sums = np.concatenate((inhibitory_row_sums,cur_layer_inhibitory_row_sums),axis=1)
-        
-        row_sums = np.concatenate((excitatory_row_sums,inhibitory_row_sums),axis=1)
-        row_sums[row_sums == 0] = 1
-        self.synapse_strength = self.synapse_strength/row_sums
+                # Normalize incoming excitatory weights to each unit        
+                weights_sums = (self.synapse_strength[post_l][pre_l].sum(axis=1).reshape(self.conf['layers_size'][post_l],1).repeat(self.conf['layers_size'][pre_l], axis=1))/self.conf['Z_vals'][post_l]
+                weights_sums[weights_sums == 0] = 1
+                self.synapse_strength[post_l][pre_l] = self.synapse_strength[post_l][pre_l]/weights_sums
         
     def update_synapse_strength(self, cur_fire_count):
         for l in range(1 ,len(self.conf['layers_size'])):
             prev_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l-1])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l-1] else 0 for i in range(self.conf['layers_size'][l-1])]]).transpose()
             cur_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l] else 0 for i in range(self.conf['layers_size'][l])]]).transpose()
             update_mat = np.matmul(2*(cur_layer_winners-0.5),prev_layer_winners.transpose())
-            # CHANGE
-            #update_mat = np.matmul((2*cur_layer_winners)-1.2,prev_layer_winners.transpose())
-            self.synapse_strength[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l])] += update_mat*self.conf['eta']*(self.conf['Z_vals'][l-1]/self.conf['layers_size'][l-1])
+            self.synapse_strength[l][l-1] += update_mat*self.conf['eta']*(self.conf['Z_vals'][l-1]/self.conf['layers_size'][l-1])
         
         self.fix_synapse_strength()
         
@@ -257,7 +211,32 @@ class ModelClass:
     def prop_external_input(self, sensory_input_vec):
         # Simulate the dynamics of the system for a single time step
         external_input = sensory_input_vec
-        internal_input = np.matmul(self.synapse_strength, self.prev_act)
+        
+        internal_input = np.zeros(external_input.shape)
+        
+        # Excitatory -> Excitatory
+        for post_l in range(0,len(self.conf['layers_size'])):
+            for pre_l in range(0,len(self.conf['layers_size'])):
+                if self.synapse_strength[post_l][pre_l] is None:
+                    continue
+                pre_l_begin = sum(self.conf['layers_size'][:pre_l])
+                pre_l_end = pre_l_begin + self.conf['layers_size'][pre_l]
+                post_l_begin = sum(self.conf['layers_size'][:post_l])
+                post_l_end = post_l_begin + self.conf['layers_size'][post_l]
+                internal_input[post_l_begin:post_l_end,[0]] = np.matmul(self.synapse_strength[post_l][pre_l],self.prev_act[pre_l_begin:pre_l_end,[0]])
+                
+        for l in range(0,len(self.conf['layers_size'])):
+            l_begin = sum(self.conf['layers_size'][:l])
+            l_end = l_begin + self.conf['layers_size'][l]
+            l_iin_index = sum(self.conf['layers_size']) + l
+            
+            # Inhibitory -> Excitatory
+            internal_input[l_begin:l_end,[0]] += (-1)*self.conf['Z_iin'][l]*self.prev_act[l_iin_index,0]*np.ones((self.conf['layers_size'][l],1))
+            
+            # Excitatory -> Inhibitory
+            Z_iin_from_single_ex = self.conf['Z_ex_to_iins'][l]/self.conf['layers_size'][l]
+            internal_input[l_iin_index] = sum(Z_iin_from_single_ex*self.prev_act[l_begin:l_end,[0]])
+        
         cur_input = np.add(external_input, internal_input)
         
         # Accumulating input
@@ -284,24 +263,10 @@ class ModelClass:
         # Linear activation function for inhibitory neurons
         return 0 + (x >= self.conf['inhibitory_threshold'])
 
-def preprocess_training_set(tr_set):
-    M = 5
-    res = []
-    for cur_pattern in tr_set:
-        non_zero_num = len([x for x in range(cur_pattern.shape[0]) if cur_pattern[x,0] > 0])
-        val = M / non_zero_num
-        new_pattern = np.zeros(cur_pattern.shape)
-        for i in range(cur_pattern.shape[0]):
-            if cur_pattern[i,0] > 0:
-                new_pattern[i, 0] = val
-        res.append(new_pattern)
-    return res
-
 N = round(ModelClass.default_configuration['layers_size'][0]**0.5)
 training_set = generate_training_set_no_generalization(ModelClass.default_configuration['sensory_input_strength'])
 # CHANGE
-training_set = training_set[:61]
-#training_set = preprocess_training_set(training_set)
+training_set = [0.1-x for x in training_set]
 test_set = training_set
 
 def plot_precision_as_a_func_of_training_epoch_num():
@@ -346,7 +311,6 @@ def plot_precision_as_a_func_of_training_epoch_num():
         total_sim_len_incorrect = 0
         if cur_training_epoch > 40:
             for input_ind in range(len(test_set)):
-                #log_print('\t\t\tEvaluating input ' + str(input_ind) + ' of ' + str(len(test_set)))
                 cur_label = input_ind % len(training_set)
                 input_vec = test_set[input_ind]
                 
