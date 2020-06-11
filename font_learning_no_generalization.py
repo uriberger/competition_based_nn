@@ -2,7 +2,8 @@ import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import time
-from font_inputs import generate_training_set_no_generalization
+#from font_inputs import generate_training_set_no_generalization
+from font_inputs_grayscale import generate_training_set_no_generalization
 
 class ModelClass:
     
@@ -10,13 +11,17 @@ class ModelClass:
         # Neuron parameters
         'excitatory_threshold' : 1,
         'inhibitory_threshold' : 1,
-        #'sensory_input_strength' : 1/100,
+        #'sensory_input_strength' : 1/10,
+        # CHANGE
         'sensory_input_strength' : 1/10,
         'response_innervation_strength' : 0.01,
-        'layers_size' : [99,2048,61],
-        #'norm_shrink_factor' : 600,
+        #'layers_size' : [400,4000,62],
         # CHANGE
-        'norm_shrink_factor' : 2400,
+        'layers_size' : [400,256,62],
+        
+        #'norm_shrink_factor' : 2400,
+        # CHANGE
+        'norm_shrink_factor' : 10,
         
         # Normalization parameters
         'Z_iin_ex_th_ratio' : [0.01,1,1],
@@ -247,7 +252,7 @@ class ModelClass:
         
         self.reset_data_structures()
         
-        return fire_history
+        return fire_history,t
         
     def prop_external_input(self, sensory_input_vec):
         # Simulate the dynamics of the system for a single time step
@@ -300,8 +305,14 @@ training_set = training_set[:61]
 test_set = training_set
 
 def plot_precision_as_a_func_of_training_epoch_num():
-    training_epoch_num = 300
+    #training_epoch_num = 300
+    # CHANGE
+    training_epoch_num = 50
     correct_counts = []
+    avg_sim_len_training = []
+    avg_sim_len_test = []
+    avg_sim_len_test_correct = []
+    avg_sim_len_test_incorrect = []
     
     model = ModelClass({},None,True)
     cur_time = time.time()
@@ -313,37 +324,66 @@ def plot_precision_as_a_func_of_training_epoch_num():
         cur_time = time.time()
         log_print('\t\tEpoch ' + str(cur_training_epoch) + ', prev epoch took ' + str(prev_epoch_time))
         cur_perm = np.random.permutation(len(training_set))
+        total_sim_len = 0
         for i in range(len(training_set)):
             #log_print('\t\t\tTraining input ' + str(cur_perm[i]))
             true_label = cur_perm[i]
             input_vec = training_set[cur_perm[i]]
             
-            fire_history = model.simulate_dynamics(input_vec,true_label)
+            fire_history,simulation_len = model.simulate_dynamics(input_vec,true_label)
             fire_count = [len(a) for a in fire_history]
             model.update_synapse_strength(fire_count)
+            
+            total_sim_len += simulation_len
+            
+        avg_sim_len_training.append(total_sim_len/len(training_set))
             
         # Evaluating
         log_print('\t\tEvaluating...')
         correct_count = 0
+        total_sim_len = 0
+        total_sim_len_correct = 0
+        total_sim_len_incorrect = 0
         if cur_training_epoch > 40:
-            #model.save_synapse_strength('epoch' + str(cur_training_epoch))
             for input_ind in range(len(test_set)):
                 #log_print('\t\t\tEvaluating input ' + str(input_ind) + ' of ' + str(len(test_set)))
                 cur_label = input_ind % len(training_set)
                 input_vec = test_set[input_ind]
                 
-                fire_history = model.simulate_dynamics(input_vec,-1)
+                fire_history,simulation_len = model.simulate_dynamics(input_vec,-1)
                 fire_count = [len(a) for a in fire_history]
+                
+                total_sim_len += simulation_len
                 
                 correct = len([x for x in fire_count[sum(model.conf['layers_size'][:-1]):sum(model.conf['layers_size'])] if x > 0]) == 1 and \
                     fire_count[sum(model.conf['layers_size'][:-1])+cur_label] > 0
                 if correct:
                     correct_count += 1
+                    total_sim_len_correct += simulation_len
+                else:
+                    total_sim_len_incorrect += simulation_len
                     
         log_print('\tCurrent correct count ' + str(correct_count))
         correct_counts.append(correct_count)
-    plt.plot(range(training_epoch_num),correct_counts)
+        avg_sim_len_test.append(total_sim_len/len(test_set))
+        if correct_count > 0:
+            avg_sim_len_test_correct.append(total_sim_len_correct/correct_count)
+        else:
+            avg_sim_len_test_correct.append(0)
+        if correct_count < len(test_set):
+            avg_sim_len_test_incorrect.append(total_sim_len_incorrect/(len(test_set)-correct_count))
+        else:
+            avg_sim_len_test_incorrect.append(0)
+    plt.plot(range(avg_sim_len_training),correct_counts)
     plt.savefig('res')
+    plt.plot(range(training_epoch_num),avg_sim_len_training)
+    plt.savefig('res_sim_len_training')
+    plt.plot(range(training_epoch_num),avg_sim_len_test)
+    plt.savefig('res_sim_len_test')
+    plt.plot(range(training_epoch_num),avg_sim_len_test_correct)
+    plt.savefig('res_sim_len_test_correct')
+    plt.plot(range(training_epoch_num),avg_sim_len_test_incorrect)
+    plt.savefig('res_sim_len_test_incorrect')
 
 def log_print(my_str):
     if write_to_log:
