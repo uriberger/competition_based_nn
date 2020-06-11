@@ -63,7 +63,6 @@ class ModelClass:
             self.synapse_strength[0].append(np.random.rand(self.conf['layers_size'][0], self.conf['layers_size'][0]))
             for _ in range(1,len(self.conf['layers_size'])):
                 self.synapse_strength[0].append(None)
-                self.synapse_strength[0].append(None)
             
             # Synapses into other layers
             for l in range(1,len(self.conf['layers_size'])):
