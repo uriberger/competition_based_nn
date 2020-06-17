@@ -11,17 +11,11 @@ class ModelClass:
         # Neuron parameters
         'excitatory_threshold' : 1,
         'inhibitory_threshold' : 1,
-        #'sensory_input_strength' : 1/10,
-        # CHANGE
         'sensory_input_strength' : 1/10,
         'response_innervation_strength' : 0.01,
-        #'layers_size' : [400,4000,62],
-        # CHANGE
-        'layers_size' : [400,256,62],
+        'layers_size' : [400,4000,62],
         
-        #'norm_shrink_factor' : 2400,
-        # CHANGE
-        'norm_shrink_factor' : 10,
+        'norm_shrink_factor' : 6000,
         
         # Normalization parameters
         'Z_iin_ex_th_ratio' : [0.01,1,1],
@@ -91,6 +85,7 @@ class ModelClass:
         # Input to 1st layer
         '''Consider the N^2 input neurons as an NXN grid. Each neuron is connected only to its
         nearest neighbors. '''
+        self.zero_matrix[:self.conf['layers_size'][0],:self.conf['layers_size'][0]] = 0
         N = round(self.conf['layers_size'][0]**0.5)
         for unit_ind in range(self.conf['layers_size'][0]):
             if unit_ind % N > 0:
@@ -164,8 +159,8 @@ class ModelClass:
         for l in range(1 ,len(self.conf['layers_size'])):
             prev_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l-1])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l-1] else 0 for i in range(self.conf['layers_size'][l-1])]]).transpose()
             cur_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l] else 0 for i in range(self.conf['layers_size'][l])]]).transpose()
-            update_mat = np.matmul(2*(cur_layer_winners-0.5),prev_layer_winners.transpose())
-            self.synapse_strength[l][l-1] += update_mat*self.conf['eta']*(self.conf['Z_vals'][l-1]/self.conf['layers_size'][l-1])
+            update_mat = np.matmul(cur_layer_winners,prev_layer_winners.transpose())
+            self.synapse_strength[l][l-1] += update_mat*self.conf['eta']*(self.conf['Z_vals'][l]/self.conf['layers_size'][l-1])
         
         self.fix_synapse_strength()
         
@@ -264,14 +259,12 @@ class ModelClass:
 
 N = round(ModelClass.default_configuration['layers_size'][0]**0.5)
 training_set = generate_training_set_no_generalization(ModelClass.default_configuration['sensory_input_strength'])
-# CHANGE
-training_set = [0.1-x for x in training_set]
+# Flipping white and black- not sure why this helps
+training_set = [ModelClass.default_configuration['sensory_input_strength']-x for x in training_set]
 test_set = training_set
 
 def plot_precision_as_a_func_of_training_epoch_num():
-    #training_epoch_num = 300
-    # CHANGE
-    training_epoch_num = 50
+    training_epoch_num = 150
     correct_counts = []
     avg_sim_len_training = []
     avg_sim_len_test = []
@@ -290,7 +283,6 @@ def plot_precision_as_a_func_of_training_epoch_num():
         cur_perm = np.random.permutation(len(training_set))
         total_sim_len = 0
         for i in range(len(training_set)):
-            #log_print('\t\t\tTraining input ' + str(cur_perm[i]))
             true_label = cur_perm[i]
             input_vec = training_set[cur_perm[i]]
             
@@ -327,6 +319,7 @@ def plot_precision_as_a_func_of_training_epoch_num():
                     total_sim_len_incorrect += simulation_len
                     
         log_print('\tCurrent correct count ' + str(correct_count))
+        
         correct_counts.append(correct_count)
         avg_sim_len_test.append(total_sim_len/len(test_set))
         if correct_count > 0:
@@ -337,14 +330,18 @@ def plot_precision_as_a_func_of_training_epoch_num():
             avg_sim_len_test_incorrect.append(total_sim_len_incorrect/(len(test_set)-correct_count))
         else:
             avg_sim_len_test_incorrect.append(0)
-    plt.plot(range(avg_sim_len_training),correct_counts)
+    plt.plot(range(training_epoch_num),correct_counts)
     plt.savefig('res')
+    plt.clf()
     plt.plot(range(training_epoch_num),avg_sim_len_training)
     plt.savefig('res_sim_len_training')
+    plt.clf()
     plt.plot(range(training_epoch_num),avg_sim_len_test)
     plt.savefig('res_sim_len_test')
+    plt.clf()
     plt.plot(range(training_epoch_num),avg_sim_len_test_correct)
     plt.savefig('res_sim_len_test_correct')
+    plt.clf()
     plt.plot(range(training_epoch_num),avg_sim_len_test_incorrect)
     plt.savefig('res_sim_len_test_incorrect')
 
