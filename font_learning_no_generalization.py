@@ -11,9 +11,9 @@ class ModelClass:
         # Neuron parameters
         'excitatory_threshold' : 1,
         'inhibitory_threshold' : 1,
-        'sensory_input_strength' : 1/10,
+        'sensory_input_strength' : 1/30,
         'response_innervation_strength' : 0.01,
-        'layers_size' : [400,4000,62],
+        'layers_size' : [400,2048,62],
         
         'norm_shrink_factor' : 6000,
         
@@ -344,6 +344,76 @@ def plot_precision_as_a_func_of_training_epoch_num():
     plt.clf()
     plt.plot(range(training_epoch_num),avg_sim_len_test_incorrect)
     plt.savefig('res_sim_len_test_incorrect')
+    
+def print_sim_len_as_a_function_of_iter_for_ob_num(ob_num):
+    experiment_iter_num = 100
+    training_iter_num = 50
+    
+    model = ModelClass({},None,True)
+    
+    all_experiments_sim_len_training = [0]*training_iter_num
+    all_experiments_sim_len_test = [0]*training_iter_num
+    all_experiments_sim_len_test_correct = [0]*training_iter_num
+    all_experiments_sim_len_test_incorrect = [0]*training_iter_num
+    for cur_experiment_iter in range(experiment_iter_num):
+        cur_perm = np.random.permutation(len(training_set))
+        reduced_training_set = [training_set[x] for x in cur_perm][:ob_num]
+        reduced_test_set = reduced_training_set
+        log_print('Experiment iter ' + str(cur_experiment_iter))
+        for cur_training_iter in range(training_iter_num):
+            total_sim_len = 0
+            for i in range(len(reduced_training_set)):
+                true_label = cur_perm[i]
+                input_vec = training_set[cur_perm[i]]
+                
+                fire_history,simulation_len = model.simulate_dynamics(input_vec,true_label)
+                fire_count = [len(a) for a in fire_history]
+                model.update_synapse_strength(fire_count)
+                
+                total_sim_len += simulation_len
+                
+            all_experiments_sim_len_training[cur_training_iter] += total_sim_len/len(training_set)
+                
+            # Evaluating
+            correct_count = 0
+            total_sim_len = 0
+            total_sim_len_correct = 0
+            total_sim_len_incorrect = 0
+            for input_ind in range(len(reduced_test_set)):
+                cur_label = input_ind % len(reduced_training_set)
+                input_vec = reduced_test_set[input_ind]
+                
+                fire_history,simulation_len = model.simulate_dynamics(input_vec,-1)
+                fire_count = [len(a) for a in fire_history]
+                
+                total_sim_len += simulation_len
+                
+                correct = len([x for x in fire_count[sum(model.conf['layers_size'][:-1]):sum(model.conf['layers_size'])] if x > 0]) == 1 and \
+                    fire_count[sum(model.conf['layers_size'][:-1])+cur_label] > 0
+                if correct:
+                    correct_count += 1
+                    total_sim_len_correct += simulation_len
+                else:
+                    total_sim_len_incorrect += simulation_len
+                        
+            all_experiments_sim_len_test[cur_training_iter] += total_sim_len/len(reduced_test_set)
+            if correct_count > 0:
+                all_experiments_sim_len_test_correct[cur_training_iter] += total_sim_len_correct/correct_count
+            if correct_count < len(reduced_test_set):
+                all_experiments_sim_len_test_incorrect[cur_training_iter] += total_sim_len_incorrect/(len(reduced_test_set)-correct_count)
+            
+    print('\nAverage simulation length during training:')
+    for cur_avg_sim_len in all_experiments_sim_len_training:
+        print(str(cur_avg_sim_len/experiment_iter_num))
+    print('\nAverage simulation length during test:')
+    for cur_avg_sim_len in all_experiments_sim_len_test:
+        print(str(cur_avg_sim_len/experiment_iter_num))
+    print('\nAverage simulation length during test correct:')
+    for cur_avg_sim_len in all_experiments_sim_len_test_correct:
+        print(str(cur_avg_sim_len/experiment_iter_num))
+    print('\nAverage simulation length during test incorrect:')
+    for cur_avg_sim_len in all_experiments_sim_len_test_incorrect:
+        print(str(cur_avg_sim_len/experiment_iter_num))
 
 def log_print(my_str):
     if write_to_log:
@@ -357,3 +427,4 @@ if write_to_log:
     log_fp = open('log.txt','w')
     
 plot_precision_as_a_func_of_training_epoch_num()
+#print_sim_len_as_a_function_of_iter_for_ob_num(1)
