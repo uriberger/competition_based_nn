@@ -11,14 +11,14 @@ class ModelClass:
         # Neuron parameters
         'excitatory_threshold' : 1,
         'inhibitory_threshold' : 1,
-        'sensory_input_strength' : 1/30,
+        'sensory_input_strength' : 1/25,
         'response_innervation_strength' : 0.01,
         'layers_size' : [400,2048,62],
         
         'norm_shrink_factor' : 6000,
         
         # Normalization parameters
-        'Z_iin_ex_th_ratio' : [0.01,1,1],
+        'Z_iin_ex_th_ratio' : [1,1,1],
         'Z_intra_layer_ex_th_ratio' : 1,
         
         # Learning parameters
@@ -156,10 +156,16 @@ class ModelClass:
                 self.synapse_strength[post_l][pre_l] = self.synapse_strength[post_l][pre_l]/weights_sums
         
     def update_synapse_strength(self, cur_fire_count):
+    # CHANGE
+    #def update_synapse_strength(self, cur_fire_count, prev_accuracy):
         for l in range(1 ,len(self.conf['layers_size'])):
             prev_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l-1])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l-1] else 0 for i in range(self.conf['layers_size'][l-1])]]).transpose()
             cur_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l] else 0 for i in range(self.conf['layers_size'][l])]]).transpose()
             update_mat = np.matmul(cur_layer_winners,prev_layer_winners.transpose())
+            # CHANGE
+            '''if l == 1:
+                #update_mat = (1-prev_accuracy)*update_mat # Linear
+                update_mat = (0.02**prev_accuracy)*update_mat # Exponential'''
             self.synapse_strength[l][l-1] += update_mat*self.conf['eta']*(self.conf['Z_vals'][l]/self.conf['layers_size'][l-1])
         
         self.fix_synapse_strength()
@@ -258,13 +264,13 @@ class ModelClass:
         return 0 + (x >= self.conf['inhibitory_threshold'])
 
 N = round(ModelClass.default_configuration['layers_size'][0]**0.5)
-training_set = generate_training_set_no_generalization(ModelClass.default_configuration['sensory_input_strength'])
+training_set = generate_training_set_no_generalization('calibri',ModelClass.default_configuration['sensory_input_strength'])
 # Flipping white and black- not sure why this helps
 training_set = [ModelClass.default_configuration['sensory_input_strength']-x for x in training_set]
 test_set = training_set
 
-def plot_precision_as_a_func_of_training_epoch_num():
-    training_epoch_num = 150
+def plot_precision_as_a_func_of_training_iter():
+    training_iter_num = 100
     correct_counts = []
     avg_sim_len_training = []
     avg_sim_len_test = []
@@ -274,12 +280,14 @@ def plot_precision_as_a_func_of_training_epoch_num():
     model = ModelClass({},None,True)
     cur_time = time.time()
     
+    correct_count = 0
+    
     # Training
     log_print('\tTraining...')
-    for cur_training_epoch in range(training_epoch_num):
-        prev_epoch_time = time.time()-cur_time
+    for cur_training_iter in range(training_iter_num):
+        prev_iter_time = time.time()-cur_time
         cur_time = time.time()
-        log_print('\t\tEpoch ' + str(cur_training_epoch) + ', prev epoch took ' + str(prev_epoch_time))
+        log_print('\t\tTraining iter ' + str(cur_training_iter) + ', prev iter took ' + str(prev_iter_time))
         cur_perm = np.random.permutation(len(training_set))
         total_sim_len = 0
         for i in range(len(training_set)):
@@ -289,18 +297,20 @@ def plot_precision_as_a_func_of_training_epoch_num():
             fire_history,simulation_len = model.simulate_dynamics(input_vec,true_label)
             fire_count = [len(a) for a in fire_history]
             model.update_synapse_strength(fire_count)
+            # CHANGE
+            #model.update_synapse_strength(fire_count, correct_count/len(test_set))
             
             total_sim_len += simulation_len
             
         avg_sim_len_training.append(total_sim_len/len(training_set))
             
-        # Evaluating
+        # Evaluating        
         log_print('\t\tEvaluating...')
         correct_count = 0
         total_sim_len = 0
         total_sim_len_correct = 0
         total_sim_len_incorrect = 0
-        if cur_training_epoch > 40:
+        if cur_training_iter > 50:
             for input_ind in range(len(test_set)):
                 cur_label = input_ind % len(training_set)
                 input_vec = test_set[input_ind]
@@ -330,19 +340,19 @@ def plot_precision_as_a_func_of_training_epoch_num():
             avg_sim_len_test_incorrect.append(total_sim_len_incorrect/(len(test_set)-correct_count))
         else:
             avg_sim_len_test_incorrect.append(0)
-    plt.plot(range(training_epoch_num),correct_counts)
+    plt.plot(range(training_iter_num),correct_counts)
     plt.savefig('res')
     plt.clf()
-    plt.plot(range(training_epoch_num),avg_sim_len_training)
+    plt.plot(range(training_iter_num),avg_sim_len_training)
     plt.savefig('res_sim_len_training')
     plt.clf()
-    plt.plot(range(training_epoch_num),avg_sim_len_test)
+    plt.plot(range(training_iter_num),avg_sim_len_test)
     plt.savefig('res_sim_len_test')
     plt.clf()
-    plt.plot(range(training_epoch_num),avg_sim_len_test_correct)
+    plt.plot(range(training_iter_num),avg_sim_len_test_correct)
     plt.savefig('res_sim_len_test_correct')
     plt.clf()
-    plt.plot(range(training_epoch_num),avg_sim_len_test_incorrect)
+    plt.plot(range(training_iter_num),avg_sim_len_test_incorrect)
     plt.savefig('res_sim_len_test_incorrect')
     
 def print_sim_len_as_a_function_of_iter_for_ob_num(ob_num):
@@ -426,5 +436,5 @@ write_to_log = False
 if write_to_log:
     log_fp = open('log.txt','w')
     
-plot_precision_as_a_func_of_training_epoch_num()
+plot_precision_as_a_func_of_training_iter()
 #print_sim_len_as_a_function_of_iter_for_ob_num(1)
