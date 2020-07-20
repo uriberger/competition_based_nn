@@ -11,18 +11,18 @@ class ModelClass:
         # Neuron parameters
         'excitatory_threshold' : 1,
         'inhibitory_threshold' : 1,
-        'sensory_input_strength' : 1/25,
+        'sensory_input_strength' : 1/65,
         'response_innervation_strength' : 0.01,
-        'layers_size' : [400,2048,62],
+        'layers_size' : [400,512,62],
         
-        'norm_shrink_factor' : 6000,
+        'norm_shrink_factor' : 9000,
         
         # Normalization parameters
-        'Z_iin_ex_th_ratio' : [1,1,1],
+        'Z_iin_ex_th_ratio' : [0.01,1,1],
         'Z_intra_layer_ex_th_ratio' : 1,
         
         # Learning parameters
-        'eta' : 0.01,
+        'eta' : [0.01,0.01],
         }
     
     def __init__(self, configuration, load_from_file, quiet):
@@ -65,9 +65,7 @@ class ModelClass:
                     self.synapse_strength[l].append(None)
                 self.synapse_strength[l].append(np.random.rand(self.conf['layers_size'][l], self.conf['layers_size'][l-1]))
                 for _ in range(l,len(self.conf['layers_size'])):
-                    self.synapse_strength[l].append(None)
-            '''self.synapse_strength = np.random.rand(unit_num, unit_num)
-            self.synapse_strength[:, excitatory_unit_num:] = (-1) * self.synapse_strength[:, excitatory_unit_num:]'''            
+                    self.synapse_strength[l].append(None)            
         else:
             file_name = "synapse_strength"
             file_name += "_" + file_suffix
@@ -108,7 +106,7 @@ class ModelClass:
         '''
         self.conf['winner_num'] = [1]
         for l in range(1,len(self.conf['layers_size'])-1):
-            self.conf['winner_num'].append(int(self.conf['layers_size'][l]/64))
+            self.conf['winner_num'].append(90)
         self.conf['winner_num'].append(1)
         
         # Initialize normalization parameters
@@ -155,18 +153,14 @@ class ModelClass:
                 weights_sums[weights_sums == 0] = 1
                 self.synapse_strength[post_l][pre_l] = self.synapse_strength[post_l][pre_l]/weights_sums
         
-    def update_synapse_strength(self, cur_fire_count):
-    # CHANGE
-    #def update_synapse_strength(self, cur_fire_count, prev_accuracy):
+    def update_synapse_strength(self, winners_losers_list, hidden_learning):
         for l in range(1 ,len(self.conf['layers_size'])):
-            prev_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l-1])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l-1] else 0 for i in range(self.conf['layers_size'][l-1])]]).transpose()
-            cur_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l] else 0 for i in range(self.conf['layers_size'][l])]]).transpose()
+            prev_layer_winners = winners_losers_list[sum(self.conf['layers_size'][:l-1]):sum(self.conf['layers_size'][:l]),[0]]
+            cur_layer_winners = winners_losers_list[sum(self.conf['layers_size'][:l]):sum(self.conf['layers_size'][:l+1]),[0]]
             update_mat = np.matmul(cur_layer_winners,prev_layer_winners.transpose())
-            # CHANGE
-            '''if l == 1:
-                #update_mat = (1-prev_accuracy)*update_mat # Linear
-                update_mat = (0.02**prev_accuracy)*update_mat # Exponential'''
-            self.synapse_strength[l][l-1] += update_mat*self.conf['eta']*(self.conf['Z_vals'][l]/self.conf['layers_size'][l-1])
+            if l == 1 and (not hidden_learning):
+                continue
+            self.synapse_strength[l][l-1] += update_mat*self.conf['eta'][l-1]*(self.conf['Z_vals'][l]/self.conf['layers_size'][l-1])
         
         self.fix_synapse_strength()
         
@@ -262,14 +256,24 @@ class ModelClass:
     def inhibitory_activation_function(self, x):
         # Linear activation function for inhibitory neurons
         return 0 + (x >= self.conf['inhibitory_threshold'])
-
-N = round(ModelClass.default_configuration['layers_size'][0]**0.5)
-training_set = generate_training_set_no_generalization('calibri',ModelClass.default_configuration['sensory_input_strength'])
-# Flipping white and black- not sure why this helps
-training_set = [ModelClass.default_configuration['sensory_input_strength']-x for x in training_set]
-test_set = training_set
-
-def plot_precision_as_a_func_of_training_iter():
+    
+    def calculate_winners(self, input_vec, cur_fire_count):
+        # Sensory winners
+        sensory_winners = np.array([[1 if input_vec[x,0]>0.5*self.conf['sensory_input_strength'] else 0 for x in range(input_vec.shape[0])]]).transpose()
+        #sensory_winners = np.array([[1 if cur_fire_count[i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])] else 0 for i in range(self.conf['layers_size'][0])]]).transpose()
+        winner_loser_list = sensory_winners
+        
+        # Other layers winners
+        for l in range(1,len(self.conf['layers_size'])):
+            cur_layer_winners = np.array([[1 if cur_fire_count[sum(self.conf['layers_size'][:l])+i]>=0.5*cur_fire_count[sum(self.conf['layers_size'])+l] else 0 for i in range(self.conf['layers_size'][l])]]).transpose()
+            winner_loser_list = np.concatenate((winner_loser_list,cur_layer_winners))
+        
+        return winner_loser_list
+    
+def plot_accuracy_as_a_func_of_training_iter():
+    training_set = generate_training_set_no_generalization('calibri',ModelClass.default_configuration['sensory_input_strength'])
+    test_set = training_set
+    
     training_iter_num = 100
     correct_counts = []
     avg_sim_len_training = []
@@ -296,9 +300,8 @@ def plot_precision_as_a_func_of_training_iter():
             
             fire_history,simulation_len = model.simulate_dynamics(input_vec,true_label)
             fire_count = [len(a) for a in fire_history]
-            model.update_synapse_strength(fire_count)
-            # CHANGE
-            #model.update_synapse_strength(fire_count, correct_count/len(test_set))
+            winners_losers_list = model.calculate_winners(input_vec,fire_count)
+            model.update_synapse_strength(winners_losers_list, False)
             
             total_sim_len += simulation_len
             
@@ -310,7 +313,8 @@ def plot_precision_as_a_func_of_training_iter():
         total_sim_len = 0
         total_sim_len_correct = 0
         total_sim_len_incorrect = 0
-        if cur_training_iter > 50:
+        confusion_matrix = np.zeros((model.conf['layers_size'][-1],model.conf['layers_size'][-1]))
+        if cur_training_iter > (training_iter_num-4):
             for input_ind in range(len(test_set)):
                 cur_label = input_ind % len(training_set)
                 input_vec = test_set[input_ind]
@@ -327,6 +331,12 @@ def plot_precision_as_a_func_of_training_iter():
                     total_sim_len_correct += simulation_len
                 else:
                     total_sim_len_incorrect += simulation_len
+                    
+                winners_losers_list = model.calculate_winners(input_vec,fire_count)
+                res_start = sum(model.conf['layers_size'][:-1])
+                for res_unit_ind in range(confusion_matrix.shape[0]):
+                    if winners_losers_list[res_start+res_unit_ind] == 1:
+                        confusion_matrix[input_ind, res_unit_ind] = 1
                     
         log_print('\tCurrent correct count ' + str(correct_count))
         
@@ -355,7 +365,38 @@ def plot_precision_as_a_func_of_training_iter():
     plt.plot(range(training_iter_num),avg_sim_len_test_incorrect)
     plt.savefig('res_sim_len_test_incorrect')
     
+    plt.clf()
+    plt.imshow(confusion_matrix,cmap='gray')
+    plt.savefig('res_confusion')
+    
+    model.save_synapse_strength('good')
+    
+def evaluate_on_new_font(new_font_name, model_name_suffix):
+    
+    model = ModelClass({},model_name_suffix,True)
+    test_set = generate_training_set_no_generalization(new_font_name,ModelClass.default_configuration['sensory_input_strength'])
+    
+    # Evaluating        
+    log_print('Evaluating...')
+    correct_count = 0
+    for input_ind in range(len(test_set)):
+        log_print('\tInput ' + str(input_ind))
+        cur_label = input_ind % len(test_set)
+        input_vec = test_set[input_ind]
+        
+        fire_history,_ = model.simulate_dynamics(input_vec,-1)
+        fire_count = [len(a) for a in fire_history]
+        
+        correct = len([x for x in fire_count[sum(model.conf['layers_size'][:-1]):sum(model.conf['layers_size'])] if x > 0]) == 1 and \
+            fire_count[sum(model.conf['layers_size'][:-1])+cur_label] > 0
+        if correct:
+            correct_count += 1
+    
+    log_print('Correct count ' + str(correct_count))
+    
 def print_sim_len_as_a_function_of_iter_for_ob_num(ob_num):
+    training_set = generate_training_set_no_generalization('calibri',ModelClass.default_configuration['sensory_input_strength'])
+    
     experiment_iter_num = 100
     training_iter_num = 50
     
@@ -425,6 +466,18 @@ def print_sim_len_as_a_function_of_iter_for_ob_num(ob_num):
     for cur_avg_sim_len in all_experiments_sim_len_test_incorrect:
         print(str(cur_avg_sim_len/experiment_iter_num))
 
+def plot_hidden_layer_sensitivity(model_name_suffix):
+    model = ModelClass({},model_name_suffix,True)
+
+    rows = 4
+    cols = 4
+    fig=plt.figure(figsize=(8, 8))
+    for k in range(16):
+        fig.add_subplot(rows, cols, k+1)
+        plt.imshow(np.reshape(model.synapse_strength[1][0][10+k,:],(20,20)),cmap='gray')
+    plt.subplots_adjust(hspace=0.5)
+    plt.show()
+
 def log_print(my_str):
     if write_to_log:
         log_fp.write(my_str+ '\n')
@@ -436,5 +489,8 @@ write_to_log = False
 if write_to_log:
     log_fp = open('log.txt','w')
     
-plot_precision_as_a_func_of_training_iter()
+plot_accuracy_as_a_func_of_training_iter()
 #print_sim_len_as_a_function_of_iter_for_ob_num(1)
+#evaluate_on_new_font('times_new_roman','good')
+#evaluate_on_new_font('calibri','good')
+#plot_hidden_layer_sensitivity('good')
