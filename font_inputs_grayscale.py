@@ -35,6 +35,8 @@ def generate_inputs(input_files_path_suffix):
             start_row = int((N-orig_gray_image.shape[0])/2)
             start_col = int((N-orig_gray_image.shape[1])/2)
             gray_image[start_row:start_row+orig_gray_image.shape[0],start_col:start_col+orig_gray_image.shape[1]] = orig_gray_image
+            # We want black pixels in the original image to be represented by high values
+            gray_image = 255 - gray_image
             
             inputs.append(gray_image)
             
