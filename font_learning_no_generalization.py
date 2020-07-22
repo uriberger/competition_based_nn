@@ -2,6 +2,7 @@ import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import time
+import imageio
 #from font_inputs import generate_training_set_no_generalization
 from font_inputs_grayscale import generate_training_set_no_generalization
 
@@ -11,7 +12,7 @@ class ModelClass:
         # Neuron parameters
         'excitatory_threshold' : 1,
         'inhibitory_threshold' : 1,
-        'sensory_input_strength' : 1/65,
+        'sensory_input_strength' : 1/30,
         'response_innervation_strength' : 0.01,
         'layers_size' : [400,512,62],
         
@@ -65,7 +66,37 @@ class ModelClass:
                     self.synapse_strength[l].append(None)
                 self.synapse_strength[l].append(np.random.rand(self.conf['layers_size'][l], self.conf['layers_size'][l-1]))
                 for _ in range(l,len(self.conf['layers_size'])):
-                    self.synapse_strength[l].append(None)            
+                    self.synapse_strength[l].append(None)
+            # CHANGE
+            '''self.synapse_strength.append([])
+            self.synapse_strength[1].append(np.zeros((self.conf['layers_size'][1],self.conf['layers_size'][0])))
+            features_len = 3
+            hidden_unit_ind = 0
+            N = int(self.conf['layers_size'][0]**0.5)
+            for sensory_row in range(N):
+                for sensory_col in range(N+1-features_len):
+                    sensory_unit_ind_begin = N*sensory_row + sensory_col
+                    self.synapse_strength[1][0][hidden_unit_ind,sensory_unit_ind_begin] = 1
+                    self.synapse_strength[1][0][hidden_unit_ind,sensory_unit_ind_begin+1] = 1
+                    self.synapse_strength[1][0][hidden_unit_ind,sensory_unit_ind_begin+2] = 1
+                    hidden_unit_ind += 1
+            for sensory_row in range(N+1-features_len):
+                for sensory_col in range(N):
+                    sensory_unit_ind_begin = N*sensory_row + sensory_col
+                    self.synapse_strength[1][0][hidden_unit_ind,sensory_unit_ind_begin] = 1
+                    self.synapse_strength[1][0][hidden_unit_ind,sensory_unit_ind_begin+N] = 1
+                    self.synapse_strength[1][0][hidden_unit_ind,sensory_unit_ind_begin+2*N] = 1
+                    hidden_unit_ind += 1
+            for _ in range(1,len(self.conf['layers_size'])):
+                self.synapse_strength[1].append(None)
+                    
+            for l in range(2,len(self.conf['layers_size'])):
+                self.synapse_strength.append([])
+                for _ in range(l-1):
+                    self.synapse_strength[l].append(None)
+                self.synapse_strength[l].append(np.random.rand(self.conf['layers_size'][l], self.conf['layers_size'][l-1]))
+                for _ in range(l,len(self.conf['layers_size'])):
+                    self.synapse_strength[l].append(None)'''
         else:
             file_name = "synapse_strength"
             file_name += "_" + file_suffix
@@ -274,7 +305,7 @@ def plot_accuracy_as_a_func_of_training_iter():
     training_set = generate_training_set_no_generalization('calibri',ModelClass.default_configuration['sensory_input_strength'])
     test_set = training_set
     
-    training_iter_num = 100
+    training_iter_num = 50
     correct_counts = []
     avg_sim_len_training = []
     avg_sim_len_test = []
@@ -292,6 +323,7 @@ def plot_accuracy_as_a_func_of_training_iter():
         prev_iter_time = time.time()-cur_time
         cur_time = time.time()
         log_print('\t\tTraining iter ' + str(cur_training_iter) + ', prev iter took ' + str(prev_iter_time))
+        
         cur_perm = np.random.permutation(len(training_set))
         total_sim_len = 0
         for i in range(len(training_set)):
@@ -302,6 +334,8 @@ def plot_accuracy_as_a_func_of_training_iter():
             fire_count = [len(a) for a in fire_history]
             winners_losers_list = model.calculate_winners(input_vec,fire_count)
             model.update_synapse_strength(winners_losers_list, False)
+            # CHANGE
+            #model.update_synapse_strength(winners_losers_list, True)
             
             total_sim_len += simulation_len
             
@@ -314,6 +348,7 @@ def plot_accuracy_as_a_func_of_training_iter():
         total_sim_len_correct = 0
         total_sim_len_incorrect = 0
         confusion_matrix = np.zeros((model.conf['layers_size'][-1],model.conf['layers_size'][-1]))
+        incorrect_dict = {}
         if cur_training_iter > (training_iter_num-4):
             for input_ind in range(len(test_set)):
                 cur_label = input_ind % len(training_set)
@@ -331,12 +366,15 @@ def plot_accuracy_as_a_func_of_training_iter():
                     total_sim_len_correct += simulation_len
                 else:
                     total_sim_len_incorrect += simulation_len
+                    incorrect_dict[input_ind] = []
                     
                 winners_losers_list = model.calculate_winners(input_vec,fire_count)
                 res_start = sum(model.conf['layers_size'][:-1])
                 for res_unit_ind in range(confusion_matrix.shape[0]):
                     if winners_losers_list[res_start+res_unit_ind] == 1:
                         confusion_matrix[input_ind, res_unit_ind] = 1
+                        if not correct:
+                            incorrect_dict[input_ind].append(res_unit_ind)
                     
         log_print('\tCurrent correct count ' + str(correct_count))
         
@@ -370,6 +408,8 @@ def plot_accuracy_as_a_func_of_training_iter():
     plt.savefig('res_confusion')
     
     model.save_synapse_strength('good')
+    
+    log_print('Incorrect dict: ' + str(incorrect_dict))
     
 def evaluate_on_new_font(new_font_name, model_name_suffix):
     
@@ -474,9 +514,83 @@ def plot_hidden_layer_sensitivity(model_name_suffix):
     fig=plt.figure(figsize=(8, 8))
     for k in range(16):
         fig.add_subplot(rows, cols, k+1)
-        plt.imshow(np.reshape(model.synapse_strength[1][0][10+k,:],(20,20)),cmap='gray')
+        cur_ind = k
+        plt.imshow(np.reshape(model.synapse_strength[1][0][cur_ind,:],(20,20)),cmap='gray')
+        plt.title(str(cur_ind))
     plt.subplots_adjust(hspace=0.5)
     plt.show()
+    
+def test_addition_of_new_char(model_name_suffix):
+    old_model = ModelClass({},model_name_suffix,True)
+    new_layers_size = old_model.conf['layers_size']
+    new_layers_size[-1] += 1
+    new_model = ModelClass({'layers_size' : new_layers_size},None,True)
+    
+    # Copy the weights from the old model to the new model
+    for post_l in range(len(new_layers_size)):
+        for pre_l in range(len(new_layers_size)):
+            if post_l == (len(new_layers_size)-1) and pre_l == (len(new_layers_size)-2):
+                new_model.synapse_strength[post_l][pre_l][:(new_layers_size[-1]-1),:] = old_model.synapse_strength[post_l][pre_l]
+            elif not (old_model.synapse_strength[post_l][pre_l] is None):
+                new_model.synapse_strength[post_l][pre_l] = old_model.synapse_strength[post_l][pre_l]
+    
+    training_iter_num = 15
+    N = 20
+    
+    image = imageio.imread('new reshaped.bmp')
+    orig_gray_image = np.reshape(image[:,:,[0]],(image.shape[0],image.shape[1]))
+    gray_image = np.ones((N,N),dtype=np.int64)*255
+    start_row = int((N-orig_gray_image.shape[0])/2)
+    start_col = int((N-orig_gray_image.shape[1])/2)
+    gray_image[start_row:start_row+orig_gray_image.shape[0],start_col:start_col+orig_gray_image.shape[1]] = orig_gray_image
+    new_input_vec = np.reshape(gray_image,(N**2,1))/255*new_model.conf['sensory_input_strength']
+    
+    training_set = generate_training_set_no_generalization('calibri',ModelClass.default_configuration['sensory_input_strength'])
+    test_set = training_set
+    test_set.append(new_input_vec)
+    
+    cur_time = time.time()
+    correct_count = 0
+    
+    # Training
+    for cur_training_iter in range(training_iter_num):
+        prev_iter_time = time.time()-cur_time
+        cur_time = time.time()
+        log_print('\tTraining iter ' + str(cur_training_iter) + ', prev iter took ' + str(prev_iter_time))
+        
+        true_label = new_model.conf['layers_size'][-1]
+        
+        fire_history,_ = new_model.simulate_dynamics(new_input_vec,true_label)
+        fire_count = [len(a) for a in fire_history]
+        winners_losers_list = new_model.calculate_winners(new_input_vec,fire_count)
+        new_model.update_synapse_strength(winners_losers_list, False)
+        
+        # Evaluating        
+        correct_count = 0
+        incorrect_dict = {}
+        for input_ind in range(len(test_set)):
+            cur_label = input_ind % len(test_set)
+            input_vec = test_set[input_ind]
+            
+            fire_history,_ = new_model.simulate_dynamics(input_vec,-1)
+            fire_count = [len(a) for a in fire_history]
+            
+            correct = len([x for x in fire_count[sum(new_model.conf['layers_size'][:-1]):sum(new_model.conf['layers_size'])] if x > 0]) == 1 and \
+                fire_count[sum(new_model.conf['layers_size'][:-1])+cur_label] > 0
+            if correct:
+                correct_count += 1
+            else:
+                incorrect_dict[input_ind] = []
+                
+            winners_losers_list = new_model.calculate_winners(input_vec,fire_count)
+            res_start = sum(new_model.conf['layers_size'][:-1])
+            for res_unit_ind in range(len(test_set)):
+                if winners_losers_list[res_start+res_unit_ind] == 1 and (not correct):
+                    incorrect_dict[input_ind].append(res_unit_ind)
+                    
+        log_print('\tCurrent correct count ' + str(correct_count))
+        
+    log_print('Incorrect dict: ' + str(incorrect_dict))
 
 def log_print(my_str):
     if write_to_log:
@@ -494,3 +608,4 @@ plot_accuracy_as_a_func_of_training_iter()
 #evaluate_on_new_font('times_new_roman','good')
 #evaluate_on_new_font('calibri','good')
 #plot_hidden_layer_sensitivity('good')
+#test_addition_of_new_char('good')
