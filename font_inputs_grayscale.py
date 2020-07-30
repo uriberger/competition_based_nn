@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import imageio
 import os
 
-input_files_path_prefix = 'font_inputs'
+input_files_path_prefix = os.path.join('..','font_inputs')
 N = 20
 
 def plot_inputs():    
